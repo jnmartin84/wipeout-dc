@@ -1,14 +1,20 @@
 ***
+
 #Wipeout-Rewrite port for Dreamcast
+
 ***
 Here's the first release. It is feature complete, 100% 60 FPS (at default video settings), music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
+
 ##Download the disc image:
+
 ***
 
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI` file and case art courtesy of `StiffPeaks`.
 ***
+
 ####Default controls:
+
 ***
     dpad / analog stick up - nose down
     dpad / analog stick down - nose up
@@ -22,6 +28,7 @@ Go to the `Releases` section of the Github repo. A `7z` file is provided with `C
 
 These may be changed in the controls menu.
 ***
+
 ####Additional menu options for video settings.
 
 The video settings default to the most performant settings. There are several options that can be changed. If you choose a combination known to cause the frame rate to drop below 60 FPS, the entry responsible for the problem will show in red.
@@ -43,12 +50,16 @@ OR
 `Texture Filtering` - `on` for bilinear filtering, `off` for point sampling. Must begin a new race to take effect. No negative performance impact.
 
 ***
+
 ####Bonus menu
+
 ***
 
 enable Rapier Class and bonus circuit(s).
 ***
+
 ###How to build
+
 ***
 Setup Dreamcast compiler.
 
