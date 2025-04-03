@@ -11,6 +11,9 @@ Here's the first release. It is feature complete, 100% 60 FPS (at default video 
 ***
 
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI` file and case art courtesy of `StiffPeaks`.
+
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v1.0
+
 ***
 
 #### Default controls:
