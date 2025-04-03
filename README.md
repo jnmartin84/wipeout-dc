@@ -1,19 +1,19 @@
 ***
 
-#Wipeout-Rewrite port for Dreamcast
+# Wipeout-Rewrite port for Dreamcast
 
 ***
 Here's the first release. It is feature complete, 100% 60 FPS (at default video settings), music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
 
-##Download the disc image:
+## Download the disc image:
 
 ***
 
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI` file and case art courtesy of `StiffPeaks`.
 ***
 
-####Default controls:
+#### Default controls:
 
 ***
     dpad / analog stick up - nose down
@@ -29,11 +29,11 @@ Go to the `Releases` section of the Github repo. A `7z` file is provided with `C
 These may be changed in the controls menu.
 ***
 
-####Additional menu options for video settings.
+#### Additional menu options for video settings.
 
 The video settings default to the most performant settings. There are several options that can be changed. If you choose a combination known to cause the frame rate to drop below 60 FPS, the entry responsible for the problem will show in red.
 
-#####Recommended video settings:
+##### Recommended video settings:
 `draw distance 0` plus any combination of `distance fade`, `shading`, `texture filter`
 
 OR
@@ -42,7 +42,7 @@ OR
 
 ***
 
-#####Available options
+##### Available options
 `Distance fade` - `off`/`on`; alpha fade to 0 at far plane. Similar to fog. Higher values cause slowdown.
 
 `Shading` - `PSX` for use of flat and gouraud shaded polygons, `PC` for all gouraud. Must begin a new race to take effect. May cause a tiny amount of slowdown but mostly unnoticeable.
@@ -51,14 +51,14 @@ OR
 
 ***
 
-####Bonus menu
+#### Bonus menu
 
 ***
 
 enable Rapier Class and bonus circuit(s).
 ***
 
-###How to build
+### How to build
 
 ***
 Setup Dreamcast compiler.
