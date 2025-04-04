@@ -315,13 +315,17 @@ static void toggle_renderdist(menu_t *menu, int data) {
 	video_probably_slow |= (((save.render_dist > 3) && !(save.fade)) << 1);
 }
 
+#if 0
 static void toggle_shading(menu_t *menu, int data) {
 	save.shading = data;
 	save.is_dirty = true;
 }
+#endif
 
 static const char *opts_renderdist[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8"};
+#if 0
 static const char *opts_psx_pc[] = {"PSX", "PC"};
+#endif
 static const char *opts_roll[] = {"0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100"};
 static const char *opts_ui_sizes[] = {"LOW", "HIGH"};
 
@@ -339,7 +343,9 @@ static void page_options_video_init(menu_t *menu) {
 	menu_page_add_toggle(page, save.show_fps, "SHOW FPS", opts_off_on, len(opts_off_on), toggle_show_fps);
 	menu_page_add_toggle(page, save.render_dist, "RENDER DISTANCE", opts_renderdist, len(opts_renderdist), toggle_renderdist);
 	menu_page_add_toggle(page, save.fade, "DISTANCE FADE", opts_off_on, len(opts_off_on), toggle_fade);
+#if 0
 	menu_page_add_toggle(page, save.shading, "SHADING", opts_psx_pc, len(opts_psx_pc), toggle_shading);	
+#endif
 	menu_page_add_toggle(page, save.filter, "TEXTURE FILTER", opts_off_on, len(opts_off_on), toggle_filter);	
 }
 

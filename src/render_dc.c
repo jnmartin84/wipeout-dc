@@ -116,6 +116,7 @@ static void update_header(uint16_t texture_index, uint32_t notflat) {
 		header1 = hp[1];
 		header2 = hp[2];
 
+#if 0
 		if ((!save.shading) && texture_index) {
 			uint32_t header0 = hp[0];
 // if you want to get flat-shaded polys for F3,F4,FT3,FT4, uncomment next 4 lines, but FPS will drop
@@ -127,6 +128,7 @@ static void update_header(uint16_t texture_index, uint32_t notflat) {
 //			hp[0] = 0x8284000a;
 			hp[0] = header0;
 		}
+#endif
 
 		// depth write
 		if (dep_en)
@@ -396,26 +398,8 @@ static float wout; //xout,yout,zout,,uout,vout;
 #define cliplerp(__a, __b, __t) ((__a) + (((__b) - (__a))*(__t)))
 
 static uint32_t color_lerp(float ft, uint32_t c1, uint32_t c2) {
-#if 0
-	uint8_t t = (ft * 255);
-   	uint32_t maskRB = 0xFF00FF;  // Mask for Red & Blue channels
-	uint32_t maskG  = 0x00FF00;  // Mask for Green channel
-	uint32_t maskA  = 0xFF000000; // Mask for Alpha channel
-
-    // Interpolate Red & Blue
-    uint32_t rb = ((((c2 & maskRB) - (c1 & maskRB)) * t) >> 8) + (c1 & maskRB);
-   
-    // Interpolate Green
-    uint32_t g  = ((((c2 & maskG) - (c1 & maskG)) * t) >> 8) + (c1 & maskG);
-
-    // Interpolate Alpha
-    uint32_t a  = ((((c2 & maskA) >> 24) - ((c1 & maskA) >> 24)) * t) >> 8;
-    a = (a + (c1 >> 24)) << 24;  // Shift back into position
-
-    return (a & maskA) | (rb & maskRB) | (g & maskG);
-#endif
 	if (ft < 0.5f) return c1;
-	return c2;	
+	return c2;
 }
 
 static void nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, float w0, float w1) {
