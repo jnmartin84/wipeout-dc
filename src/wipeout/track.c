@@ -333,11 +333,6 @@ void track_load_sections(char *file_name) {
 		ts->face_start = get_i16(bytes, &p);
 		ts->face_count = get_i16(bytes, &p);
 
-		if (ts->face_count < 0) {
-			dbgio_printf("fuckin neg face count\n");
-			exit(-1);
-		}
-
 		// JNMARTIN84: ADD BOUNDING RADIUS CALCULATION
 		ts->radius = 0.0f;
 
