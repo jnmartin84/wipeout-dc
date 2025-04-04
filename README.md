@@ -37,7 +37,7 @@ These may be changed in the controls menu.
 The video settings default to the most performant settings. There are several options that can be changed. If you choose a combination known to cause the frame rate to drop below 60 FPS, the entry responsible for the problem will show in red.
 
 ##### Recommended video settings:
-`draw distance 0` plus any combination of `distance fade`, `texture filter`
+`draw distance 0` plus any combination of `distance fade`, `shading`, `texture filter`
 
 OR
 
@@ -48,9 +48,11 @@ OR
 ##### Available options
 `Distance fade` - `off`/`on`; alpha fade to 0 at far plane. Similar to fog. Higher values cause slowdown.
 
+`Shading` - `PSX` for use of flat and gouraud shaded polygons, `PC` for all gouraud. Must begin a new race to take effect. May cause a tiny amount of slowdown but mostly unnoticeable.
+
 `Texture Filtering` - `on` for bilinear filtering, `off` for point sampling. Must begin a new race to take effect. No negative performance impact.
 
-Note: there used to be a shading option but I removed it at the last minute. No point in causing slowdown for something you can't actually *see* a difference from.
+Note: The shading option is disabled in the code in the repo. It doesn't really make any difference so I am going to remove it in future.
 
 ***
 
