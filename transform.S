@@ -64,9 +64,7 @@ mat_transform_vec_array_to_vec_array_nomod_nodivw:
 	fmov    fr2,@-r4
     fneg fr3
 	fmov	fr1, @-r4
-    movt    r1
     fcmp/gt fr3, fr2
-
 	fmov	fr0, @-r4
     movt r7
     add #32,r4
