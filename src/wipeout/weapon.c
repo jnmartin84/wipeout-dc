@@ -14,28 +14,6 @@ extern int32_t ctrlNeedTargetIcon;
 extern int ctrlnearShip;
 int16_t Shielded = 0;
 
-typedef struct weapon_t {
-	float timer;
-	ship_t *owner;
-	ship_t *target;
-	section_t *section;
-	Object *model;
-	bool active;
-
-	int16_t trail_particle;
-	int16_t track_hit_particle;
-	int16_t ship_hit_particle;
-	float trail_spawn_timer;
-
-	int16_t type;
-	vec3_t acceleration;
-	vec3_t velocity;
-	vec3_t position;
-	vec3_t angle;
-	float drag;
-
-	void (*update_func)(struct weapon_t *);
-} weapon_t;
 
 
 weapon_t *weapons;
@@ -215,8 +193,11 @@ void weapons_update(void) {
 	}
 }
 
+static mat4_t __attribute__((aligned(32))) mat;
 void weapons_draw(void) {
-	mat4_t mat = mat4_identity();
+	memset(&mat.cols, 0, 64);
+	mat.cols[0][0] = mat.cols[1][1] = mat.cols[2][2] = mat.cols[3][3] = 1.0f;
+
 	for (int i = 0; i < weapons_active; i++) {
 		weapon_t *weapon = &weapons[i];
 		if (weapon->model) {
@@ -356,15 +337,6 @@ void weapon_update_mine_lights(weapon_t *self, int index) {
 	for (int i = 0; i < 8; i++) {
 		switch (prm.primitive->type) {
 		case PRM_TYPE_GT3:
-			//prm.gt3->color[0].r = 230;
-			//prm.gt3->color[1].r = r;
-			//prm.gt3->color[2].r = r;
-			//prm.gt3->color[0].g = 0;
-			//prm.gt3->color[1].g = 0x40;
-			//prm.gt3->color[2].g = 0x40;
-			//prm.gt3->color[0].b = 0;
-			//prm.gt3->color[1].b = 0;
-			//prm.gt3->color[2].b = 0;
 			prm.gt3->color[0] = packcol(230,0,0);
 			prm.gt3->color[1] = packcol(r,0x40,0);
 			prm.gt3->color[2] = prm.gt3->color[1];
@@ -396,7 +368,7 @@ void weapon_update_mine(weapon_t *self) {
 				ship->speed = ship->speed * 0.125;
 			}
 		}
-	}	
+	}
 }
 
 
@@ -553,13 +525,11 @@ void weapon_fire_shield(ship_t *ship) {
 	self->timer = WEAPON_SHIELD_DURATION;
 	self->model = weapon_assets.shield;
 	self->update_func = weapon_update_shield;
-
 	flags_add(self->owner->flags, SHIP_SHIELDED);
 }
 
 void weapon_update_shield(weapon_t *self) {
 	shields_active = 0;
-
 	if (self->timer <= 0) {
 		self->active = false;
 		flags_rm(self->owner->flags, SHIP_SHIELDED);
@@ -567,7 +537,6 @@ void weapon_update_shield(weapon_t *self) {
 	}
 
 	shields_active = 1;
-
 	if (flags_is(self->owner->flags, SHIP_VIEW_INTERNAL)) {
 		self->position = ship_cockpit(self->owner);
 		self->model = weapon_assets.shield_internal;

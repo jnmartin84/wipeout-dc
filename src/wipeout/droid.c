@@ -35,7 +35,10 @@ void droid_init(droid_t *droid, ship_t *ship) {
 	droid->angle = vec3(0, 0, 0);
 	droid->angular_velocity = vec3(0, 0, 0);
 	droid->update_timer = DROID_UPDATE_TIME_INITIAL;
-	droid->mat = mat4_identity();
+
+	void *om = mem_bump(sizeof(mat4_t) + 32);
+	droid->mat = (mat4_t *)(((uintptr_t)om + 31) & ~31);
+	droid->mat->cols[0][0] = droid->mat->cols[1][1] = droid->mat->cols[2][2] = droid->mat->cols[3][3] = 1.0f;
 
 	droid->cycle_timer = 0;
 	droid->update_func = droid_update_intro;
@@ -76,48 +79,22 @@ void droid_draw(droid_t *droid) {
 		switch (prm.f3->type) {
 			case PRM_TYPE_GT3:
 				color = packcol(r,g,b);
-				//prm.gt3->color[0].r = r;
-				//prm.gt3->color[0].g = g;
-				//prm.gt3->color[0].b = b;
-
-				//prm.gt3->color[1].r = r;
-				//prm.gt3->color[1].g = g;
-				//prm.gt3->color[1].b = b;
-
-				//prm.gt3->color[2].r = r;
-				//prm.gt3->color[2].g = g;
-				//prm.gt3->color[2].b = b;
 				prm.gt3->color[2] = prm.gt3->color[1] = prm.gt3->color[0] = color;
 				prm.gt3++;
 				break;
 
 			case PRM_TYPE_GT4:
 				color = packcol(r,g,b);
-				//prm.gt4->color[0].r = r;
-				//prm.gt4->color[0].g = g;
-				//prm.gt4->color[0].b = b;
-
-				//prm.gt4->color[1].r = r;
-				//prm.gt4->color[1].g = g;
-				//prm.gt4->color[1].b = b;
-
-				//prm.gt4->color[2].r = r;
-				//prm.gt4->color[2].g = g;
-				//prm.gt4->color[2].b = b;
 				prm.gt4->color[2] = prm.gt4->color[1] = prm.gt4->color[0] = color;
-
-				//prm.gt4->color[3].r = 40;
-				//prm.gt4->color[3].g = 40;
-				//prm.gt4->color[3].b = 40;
 				prm.gt4->color[3] = packcol(40,40,40);
 				prm.gt4++;
 				break;
 		}
 	}
 
-	mat4_set_translation(&droid->mat, droid->position);
-	mat4_set_yaw_pitch_roll(&droid->mat, droid->angle);
-	object_draw(droid_model, &droid->mat);
+	mat4_set_translation(droid->mat, droid->position);
+	mat4_set_yaw_pitch_roll(droid->mat, droid->angle);
+	object_draw(droid_model, droid->mat);
 }
 
 void droid_update(droid_t *droid, ship_t *ship) {
@@ -128,7 +105,7 @@ void droid_update(droid_t *droid, ship_t *ship) {
 	droid->position = vec3_add(droid->position, vec3_mulf(droid->velocity, 0.015625 * 30 * system_tick()));
 	droid->angle = vec3_add(droid->angle, vec3_mulf(droid->angular_velocity, system_tick()));
 	droid->angle = vec3_wrap_angle(droid->angle);
-	
+
 	if (flags_is(droid->sfx_tractor->flags, SFX_PLAY)) {
 		sfx_set_position(droid->sfx_tractor, droid->position, droid->velocity, 0.5);
 	}
@@ -249,9 +226,8 @@ void droid_update_rescue(droid_t *droid, ship_t *ship) {
 		droid->position = target;
 	}
 	else {
-		droid->velocity = vec3_mulf(distance, 16);	
+		droid->velocity = vec3_mulf(distance, 16);
 	}
-
 
 	// Are we done rescuing?
 	if (flags_not(ship->flags, SHIP_IN_RESCUE)) {

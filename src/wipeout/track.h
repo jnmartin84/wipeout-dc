@@ -46,6 +46,8 @@ typedef struct section_t {
 	struct section_t *prev;
 	struct section_t *next;
 
+	track_face_t *base_face;
+
 	vec3_t center;
 
 	int16_t face_start;
@@ -55,6 +57,8 @@ typedef struct section_t {
 	int16_t num;
 
 	float radius;
+	float drawdist;
+	float scenedist;
 } section_t;
 
 #define SECTION_JUMP            1
@@ -74,9 +78,8 @@ typedef struct track_t {
 	int32_t pickups_len;
 	int32_t total_section_nums;
 	texture_list_t textures;
-	
+
 	track_face_t *faces;
-	pvr_vertex_t *pvr;
 	pvr_vertex_t *apvr;
 	section_t *sections;
 	track_pickup_t *pickups;

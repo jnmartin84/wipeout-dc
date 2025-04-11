@@ -85,7 +85,7 @@ typedef struct ship_t {
 	vec3_t angular_acceleration;
 
 	vec3_t temp_target; // used for start position and rescue target
-	
+
 	float turn_rate;
 	float turn_rate_max;
 	float turn_rate_from_hit;
@@ -130,7 +130,7 @@ typedef struct ship_t {
 	float update_timer;
 	float last_impact_time;
 
-	mat4_t mat;
+	mat4_t *mat;
 	Object *model;
 	Object *collision_model;
 	uint16_t shadow_texture;

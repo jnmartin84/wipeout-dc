@@ -26,7 +26,7 @@ SRC_DIRS += src/wipeout
 C_FILES := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
 
 # Object files
-O_FILES := src/input.o src/mem.o src/platform_dc.o src/render_dc.o src/system.o src/types_dc.o src/utils.o src/wipeout/camera.o src/wipeout/droid.o src/wipeout/game.o src/wipeout/hud.o src/wipeout/image.o src/wipeout/ingame_menus.o src/wipeout/intro.o src/wipeout/main_menu.o src/wipeout/menu.o src/wipeout/object.o src/wipeout/particle.o src/wipeout/race.o src/wipeout/scene.o src/wipeout/sfx.o src/wipeout/ship_ai.o src/wipeout/ship.o src/wipeout/ship_player.o src/wipeout/title.o src/wipeout/track.o src/wipeout/ui.o src/wipeout/weapon.o src/sndwav.o src/vmu.o memcpy32.o src/matrix.o
+O_FILES := src/alloc.o src/input.o src/mem.o src/platform_dc.o src/render_dc.o src/system.o src/types_dc.o src/utils.o src/wipeout/camera.o src/wipeout/droid.o src/wipeout/game.o src/wipeout/hud.o src/wipeout/image.o src/wipeout/ingame_menus.o src/wipeout/intro.o src/wipeout/main_menu.o src/wipeout/menu.o src/wipeout/object.o src/wipeout/particle.o src/wipeout/race.o src/wipeout/scene.o src/wipeout/sfx.o src/wipeout/ship_ai.o src/wipeout/ship.o src/wipeout/ship_player.o src/wipeout/title.o src/wipeout/track.o src/wipeout/ui.o src/wipeout/weapon.o src/sndwav.o src/vmu.o asmfuncs.o src/matrix.o
 
 # tools
 PRINT = printf
@@ -55,7 +55,7 @@ buildtarget:
 	mkdir -p $(BUILD_DIR)
 
 $(TARGET): $(O_FILES) | buildtarget
-	kos-cc -c memcpy32.S -o memcpy32.o
+	kos-cc -c asmfuncs.S -o asmfuncs.o
 	kos-cc -o ${BUILD_DIR}/$@ $(O_FILES)
 
 clean:
@@ -64,6 +64,8 @@ clean:
 cdi:
 	@test -s ${BUILD_DIR}/${TARGET_STRING} || { echo "Please run make or copy release ${TARGET_STRING} to ${BUILD_DIR} dir before running make cdi . Exiting"; exit 1; }
 	$(RM) wipeout-rewrite.cdi
+	cp sonic.raw wipeout/common
+	cp dcpad.bin wipeout/common
 	mkdcdisc -d wipeout -e $(BUILD_DIR)/$(TARGET) -o wipeout-rewrite.cdi -n "WIPEOUT" -N
 
 dcload: $(TARGET)

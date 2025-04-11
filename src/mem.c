@@ -18,6 +18,10 @@ static uint32_t temp_objects_len;
 // These allocations persist for many frames. The allocator level is reset
 // whenever we load a new race track or menu in game_set_scene()
 
+uint32_t mem_available(void) {
+	return MEM_HUNK_BYTES - bump_len;
+}
+
 void *mem_mark(void) {
 	return &hunk[bump_len];
 }

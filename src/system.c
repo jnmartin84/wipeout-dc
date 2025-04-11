@@ -31,7 +31,7 @@ void system_init(void) {
 	time_real = platform_now();
 	input_init();
 
-	render_init(platform_screen_size());
+	render_init();
 	game_init();
 }
 
@@ -46,6 +46,7 @@ void system_exit(void) {
 
 void system_update(void) {
 	float time_real_now = platform_now();
+
 	float real_delta = time_real_now - time_real;
 	time_real = time_real_now;
 	tick_last = fminf(real_delta, 0.1f) * time_scale;
@@ -57,14 +58,15 @@ void system_update(void) {
 	if (cycle_time > 3600 * F_PI) {
 		cycle_time -= 3600 * F_PI;
 	}
-	
+
 	render_frame_prepare();
-	
+
 	game_update();
 
 	render_frame_end();
+
 	input_clear();
-	mem_temp_check();
+	//mem_temp_check();
 }
 
 void system_reset_cycle_time(void) {
@@ -72,7 +74,7 @@ void system_reset_cycle_time(void) {
 }
 
 void system_resize(vec2i_t size) {
-	render_set_screen_size(size);
+	;
 }
 
 float system_time_scale_get(void) {

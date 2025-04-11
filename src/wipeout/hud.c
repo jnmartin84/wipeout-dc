@@ -2,6 +2,7 @@
 #include "../mem.h"
 #include "../utils.h"
 #include "../system.h"
+#include "../platform.h"
 
 #include "object.h"
 #include "track.h"
@@ -61,8 +62,10 @@ void hud_load(void) {
 	weapon_icon_textures = image_get_compressed_textures("wipeout/common/wicons.cmp");
 	LOAD_UNFILTERED = 0;
 }
+
 #include <kos.h>
 extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+
 static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speedo_bar_t *b, float f, rgba_t color_override) {
 	rgba_t left_color, right_color;
 	if (color_override.a > 0) {
@@ -122,7 +125,7 @@ static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speed
 	vs[3].argb = rcol;
 	vs[3].oargb = 0;
 
-	render_noclip_quad(HUD_NO_TEXTURE);
+	render_hud_quad(HUD_NO_TEXTURE);
 }
 
 static void hud_draw_speedo_bars(vec2i_t *pos, float f, rgba_t color_override) {
@@ -159,17 +162,41 @@ static void hud_draw_speedo_bars(vec2i_t *pos, float f, rgba_t color_override) {
 }
 
 static void hud_draw_speedo(int speed, int thrust) {
-	vec2i_t facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
-	vec2i_t bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
+	vec2i_t facia_pos;
+	vec2i_t bar_pos;
+	if (platform_screen_size().y == 360) {
+		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -35));
+		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -30));
+	} else {
+		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
+		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
+	}
 	hud_draw_speedo_bars(&bar_pos, thrust / 65.0, rgba(255, 0, 0, 128));
 	hud_draw_speedo_bars(&bar_pos, speed / 2166.0, rgba(0, 0, 0, 0));
 	render_push_2d(facia_pos, ui_scaled(render_texture_size(speedo_facia_texture)), rgba(128, 128, 128, 255), speedo_facia_texture);
 }
 
+extern mat4_t __attribute__((aligned(32))) view_mat;
+extern mat4_t __attribute__((aligned(32))) mvp_mat;
+extern mat4_t __attribute__((aligned(32))) vp_mat;
+
+void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
+
 static void hud_draw_target_icon(vec3_t position) {
 	vec2i_t screen_size = render_size();
 	vec2i_t size = ui_scaled(render_texture_size(target_reticle));
-	vec3_t projected = render_transform(position);
+	vec3_t projected;
+
+	float rx = position.x;
+	float ry = position.y;
+	float rz = position.z;
+	mat_load_apply(&vp_mat.cols, &view_mat.cols);
+	mat_trans_single3(rx,ry,rz);
+	mat_load(&mvp_mat.cols);
+
+	projected.x = rx;
+	projected.y = ry;
+	projected.z = rz;
 
 	// Not on screen?
 	if (
@@ -184,16 +211,23 @@ static void hud_draw_target_icon(vec3_t position) {
 		(( projected.x + 1.0) / 2.0) * screen_size.x - size.x / 2,
 		((-projected.y + 1.0) / 2.0) * screen_size.y - size.y / 2
 	);
+
 	render_push_2d(pos, size, rgba(128, 128, 128, 128), target_reticle);
 }
 
 void hud_draw(ship_t *ship) {
 	// Current lap time
 	if (ship->lap >= 0) {
-		ui_draw_time(ship->lap_time, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -30)), UI_SIZE_16, UI_COLOR_DEFAULT);
-	
-		for (int i = 0; i < ship->lap && i < NUM_LAPS-1; i++) {
-			ui_draw_time(g.lap_times[ship->pilot][i], ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -45 - (10 * i))), UI_SIZE_8, UI_COLOR_ACCENT);
+		if (platform_screen_size().y == 360) {
+			ui_draw_time(ship->lap_time, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -25)), UI_SIZE_16, UI_COLOR_DEFAULT);
+			for (int i = 0; i < ship->lap && i < NUM_LAPS-1; i++) {
+				ui_draw_time(g.lap_times[ship->pilot][i], ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -35 - (10 * i))), UI_SIZE_8, UI_COLOR_ACCENT);
+			}
+		} else {
+			ui_draw_time(ship->lap_time, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -30)), UI_SIZE_16, UI_COLOR_DEFAULT);
+			for (int i = 0; i < ship->lap && i < NUM_LAPS-1; i++) {
+				ui_draw_time(g.lap_times[ship->pilot][i], ui_scaled_pos(UI_POS_BOTTOM | UI_POS_LEFT, vec2i(16, -45 - (10 * i))), UI_SIZE_8, UI_COLOR_ACCENT);
+			}
 		}
 	}
 
@@ -213,10 +247,14 @@ void hud_draw(ship_t *ship) {
 
 	// Framerate
 	if (save.show_fps) {
-//	    pvr_stats_t stats;
-//		pvr_get_stats(&stats);
 		ui_draw_text("FPS", ui_scaled(vec2i(16, 78)), UI_SIZE_8, UI_COLOR_ACCENT);
-		ui_draw_number((int)(g.frame_rate) /*(int)((float)(16666667*60) / (float)stats.frame_last_time)*/, ui_scaled(vec2i(16, 90)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		ui_draw_number((int)(g.frame_rate), ui_scaled(vec2i(16, 90)), UI_SIZE_8, UI_COLOR_DEFAULT);
+	}
+
+#define DRAW_SECTION_NUM 0
+	if (DRAW_SECTION_NUM) {
+		ui_draw_text("SECTION", ui_scaled(vec2i(16, 100)), UI_SIZE_8, UI_COLOR_ACCENT);
+		ui_draw_number(g.ships[g.pilot].section_num, ui_scaled(vec2i(16, 112)), UI_SIZE_8, UI_COLOR_DEFAULT);
 	}
 
 	// Lap Record
@@ -236,8 +274,16 @@ void hud_draw(ship_t *ship) {
 
 	// Weapon icon
 	if (ship->weapon_type != WEAPON_TYPE_NONE) {
-		vec2i_t pos = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 20));
-		vec2i_t size = ui_scaled(vec2i(32, 32));
+		vec2i_t pos;
+		vec2i_t size;
+		if (platform_screen_size().y == 360) {
+			pos = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 15));
+			size = ui_scaled(vec2i(24, 24));
+		}
+		else {
+			pos = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 20));
+			size = ui_scaled(vec2i(32, 32));
+		}
 		uint16_t icon = texture_from_list(weapon_icon_textures, ship->weapon_type-1);
 		render_push_2d(pos, size, rgba(128,128,128,255), icon);
 	}
@@ -245,7 +291,11 @@ void hud_draw(ship_t *ship) {
 	// Lives
 	if (g.race_type == RACE_TYPE_CHAMPIONSHIP) {
 		for (int i = 0; i < g.lives; i++) {
-			ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -50)), UI_COLOR_DEFAULT);
+			if (platform_screen_size().y == 360) {
+				ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -40)), UI_COLOR_DEFAULT);	
+			} else {
+				ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -50)), UI_COLOR_DEFAULT);
+			}
 		}
 	}
 

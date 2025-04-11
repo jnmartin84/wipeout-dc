@@ -4,6 +4,7 @@
 #include "../system.h"
 #include "../utils.h"
 #include "../mem.h"
+#include "../platform.h"
 
 #include "menu.h"
 #include "ingame_menus.h"
@@ -47,7 +48,6 @@ static void button_restart_confirm(menu_t *menu, int data) {
 }
 
 static void button_restart_or_quit(menu_t *menu, int data) {
-//	wav_volume(0);//255 * save.music_volume);		
 	if (data) {
 		race_restart();
 	}
@@ -63,7 +63,6 @@ static void button_restart(menu_t *menu, int data) {
 
 static void button_quit_confirm(menu_t *menu, int data) {
 	if (data) {
-//		wav_volume(0);//255 * save.music_volume);
 		in_race = 0;
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
@@ -127,7 +126,6 @@ menu_t *game_over_menu_init(void) {
 // Race Stats
 
 static void button_qualify_confirm(menu_t *menu, int data) {
-//	wav_volume(0);//255 * save.music_volume);		
 	if (data) {
 		race_restart();
 	}
@@ -159,55 +157,106 @@ static void button_race_stats_continue(menu_t *menu, int data) {
 int no_fade = 0;
 extern int menu_overlay;
 static void page_race_stats_draw(menu_t *menu, int data) {
-	menu_page_t *page = &menu->pages[menu->index];
-	vec2i_t pos = page->title_pos;
-	pos.x -= 140;
-	pos.y += 32;
-	ui_pos_t anchor = UI_POS_MIDDLE | UI_POS_CENTER;
+	if (platform_screen_size().y == 360) {
+		menu_page_t *page = &menu->pages[menu->index];
+		vec2i_t pos = page->title_pos;
+		pos.x -= 140;
+		pos.y += 32;
+		ui_pos_t anchor = UI_POS_MIDDLE | UI_POS_CENTER;
 
-	// Pilot portrait and race position - only for championship or single race
-	if (g.race_type != RACE_TYPE_TIME_TRIAL) {
-		vec2i_t image_pos = ui_scaled_pos(anchor, vec2i(pos.x + 180, pos.y));
-		uint16_t image = texture_from_list(pilot_portraits, g.race_position <= QUALIFYING_RANK ? 1 : 0);
-		no_fade = 1;
-		menu_overlay = 2;
-		render_push_2d(image_pos, ui_scaled(render_texture_size(image)), rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
-		menu_overlay = 0;		
-		no_fade = 0;
-		ui_draw_image(image_pos, image);
+		// Pilot portrait and race position - only for championship or single race
+		if (g.race_type != RACE_TYPE_TIME_TRIAL) {
+			vec2i_t image_pos = ui_scaled_pos(anchor, vec2i(pos.x + 170, pos.y));
+			uint16_t image = texture_from_list(pilot_portraits, g.race_position <= QUALIFYING_RANK ? 1 : 0);
+			no_fade = 1;
+			menu_overlay = 2;
+			vec2i_t imgsize = render_texture_size(image);
+			imgsize.x = imgsize.x * 3 / 4;
+			imgsize.y = imgsize.y * 3 / 4;
+			render_set_depth_test(false);
+			render_push_2d(image_pos, ui_scaled(imgsize), rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
+			render_set_depth_test(true);
+			menu_overlay = 0;
+			no_fade = 0;
+			ui_draw_image(image_pos, image);
 
-		ui_draw_text("RACE POSITION", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
-		ui_draw_number(g.race_position, ui_scaled_pos(anchor, vec2i(pos.x + ui_text_width("RACE POSITION", UI_SIZE_8)+8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+			ui_draw_text("RACE POSITION", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_number(g.race_position, ui_scaled_pos(anchor, vec2i(pos.x + ui_text_width("RACE POSITION", UI_SIZE_8)+8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		}
+
+		pos.y += 20;
+
+		ui_draw_text("RACE STATISTICS", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 12;
+
+		for (int i = 0; i < NUM_LAPS; i++) {
+			ui_draw_text("LAP", ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_number(i+1, ui_scaled_pos(anchor, vec2i(pos.x + 50, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_time(g.lap_times[g.pilot][i], ui_scaled_pos(anchor, vec2i(pos.x + 72, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+			pos.y+= 12;
+		}
+		pos.y += 4;
+
+		ui_draw_text("RACE TIME", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 12;
+		ui_draw_time(g.race_time, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		pos.y += 12;
+
+		ui_draw_text("BEST LAP", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 12;
+		ui_draw_time(g.best_lap, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		pos.y += 12;
+	} else {
+		menu_page_t *page = &menu->pages[menu->index];
+		vec2i_t pos = page->title_pos;
+		pos.x -= 140;
+		pos.y += 32;
+		ui_pos_t anchor = UI_POS_MIDDLE | UI_POS_CENTER;
+
+		// Pilot portrait and race position - only for championship or single race
+		if (g.race_type != RACE_TYPE_TIME_TRIAL) {
+			vec2i_t image_pos = ui_scaled_pos(anchor, vec2i(pos.x + 180, pos.y));
+			uint16_t image = texture_from_list(pilot_portraits, g.race_position <= QUALIFYING_RANK ? 1 : 0);
+			no_fade = 1;
+			menu_overlay = 2;
+			render_push_2d(image_pos, ui_scaled(render_texture_size(image)), rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
+			menu_overlay = 0;
+			no_fade = 0;
+			ui_draw_image(image_pos, image);
+
+			ui_draw_text("RACE POSITION", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_number(g.race_position, ui_scaled_pos(anchor, vec2i(pos.x + ui_text_width("RACE POSITION", UI_SIZE_8)+8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		}
+
+		pos.y += 32;
+
+		ui_draw_text("RACE STATISTICS", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 16;
+
+		for (int i = 0; i < NUM_LAPS; i++) {
+			ui_draw_text("LAP", ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_number(i+1, ui_scaled_pos(anchor, vec2i(pos.x + 50, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
+			ui_draw_time(g.lap_times[g.pilot][i], ui_scaled_pos(anchor, vec2i(pos.x + 72, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+			pos.y+= 12;
+		}
+		pos.y += 32;
+
+		ui_draw_text("RACE TIME", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 12;
+		ui_draw_time(g.race_time, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		pos.y += 12;
+
+		ui_draw_text("BEST LAP", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
+		pos.y += 12;
+		ui_draw_time(g.best_lap, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
+		pos.y += 12;
 	}
-
-	pos.y += 32;
-
-	ui_draw_text("RACE STATISTICS", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
-	pos.y += 16;
-
-	for (int i = 0; i < NUM_LAPS; i++) {
-		ui_draw_text("LAP", ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
-		ui_draw_number(i+1, ui_scaled_pos(anchor, vec2i(pos.x + 50, pos.y)), UI_SIZE_8, UI_COLOR_ACCENT);
-		ui_draw_time(g.lap_times[g.pilot][i], ui_scaled_pos(anchor, vec2i(pos.x + 72, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
-		pos.y+= 12;
-	}
-	pos.y += 32;
-
-	ui_draw_text("RACE TIME", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
-	pos.y += 12;
-	ui_draw_time(g.race_time, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
-	pos.y += 12;
-
-	ui_draw_text("BEST LAP", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
-	pos.y += 12;
-	ui_draw_time(g.best_lap, ui_scaled_pos(anchor, vec2i(pos.x + 8, pos.y)), UI_SIZE_8, UI_COLOR_DEFAULT);
-	pos.y += 12;
 }
 
 menu_t *race_stats_menu_init(void) {
 	sfx_play(SFX_MENU_SELECT);
 	menu_reset(ingame_menu);
-	
+
 	char *title;
 	if (g.race_type == RACE_TYPE_TIME_TRIAL) {
 		title = "";
@@ -221,7 +270,11 @@ menu_t *race_stats_menu_init(void) {
 	menu_page_t *page = menu_push(ingame_menu, title, page_race_stats_draw);
 	flags_add(page->layout_flags, MENU_FIXED);
 	page->title_anchor = UI_POS_MIDDLE | UI_POS_CENTER;
-	page->title_pos = vec2i(0, -100);
+	if (platform_screen_size().y == 360) {
+		page->title_pos = vec2i(0, -75);
+	} else {
+		page->title_pos = vec2i(0, -100);
+	}
 	menu_page_add_button(page, 1, "", button_race_stats_continue);
 	return ingame_menu;
 }
@@ -395,12 +448,12 @@ static void page_hall_of_fame_draw(menu_t *menu, int data) {
 	// complications
 
 	highscores_t *hs = &save.highscores[g.race_class][g.circut][g.highscore_tab];
-	
+
 	if (hs_entry_complete) {
 		sfx_play(SFX_MENU_SELECT);
 		strncpy(save.highscores_name, hs_new_entry.name, 4);
 		save.is_dirty = true;
-		
+
 		// Insert new highscore entry into the save struct
 		//highscores_entry_t temp_entry = hs->entries[0];
 		for (int i = 0; i < NUM_HIGHSCORES; i++) {
@@ -484,7 +537,7 @@ static void text_scroll_menu_draw(menu_t *menu, int data) {
 			pos.y += 32 * scale;
 		}
 		else {
-			ui_draw_text_centered(line, pos, UI_SIZE_8, UI_COLOR_DEFAULT);	
+			ui_draw_text_centered(line, pos, UI_SIZE_8, UI_COLOR_DEFAULT);
 			pos.y += 12 * scale;
 		}
 	}

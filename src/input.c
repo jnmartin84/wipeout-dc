@@ -237,6 +237,8 @@ void input_bind(input_layer_t layer, button_t button, uint8_t action) {
 	actions_state[action] = 0;
 	bindings[layer][button] = action;
 
+	// this fixes the issue where remapped buttons dont actually work
+	// https://github.com/phoboslab/wipeout-rewrite/issues/132
 	clear(expected_button);
 }
 

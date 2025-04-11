@@ -58,7 +58,7 @@ extern int LOAD_UNFILTERED;
 void ui_load(void) {
 	LOAD_UNFILTERED = 1;
 	texture_list_t tl = image_get_compressed_textures("wipeout/textures/drfonts.cmp");
-	
+
 	char_set[UI_SIZE_16].texture   = texture_from_list(tl, 0);
 	char_set[UI_SIZE_12].texture   = texture_from_list(tl, 1);
 	char_set[UI_SIZE_8 ].texture   = texture_from_list(tl, 2);
@@ -207,8 +207,14 @@ void ui_draw_text(const char *text, vec2i_t pos, ui_text_size_t size, rgba_t col
 	}
 }
 
+#include "../platform.h"
+
 void ui_draw_image(vec2i_t pos, uint16_t texture) {
 	vec2i_t scaled_size = ui_scaled(render_texture_size(texture));
+	if (platform_screen_size().y == 360) {
+		scaled_size.x = scaled_size.x * 3 / 4;
+		scaled_size.y = scaled_size.y * 3 / 4;
+	}
 	drawing_text = 1;
 	render_set_depth_test(false);
 	render_push_2d(pos, scaled_size, rgba(224, 224, 224, 255), texture);

@@ -10,9 +10,13 @@ static particle_t *particles;
 static int particles_active = 0;
 static texture_list_t particle_textures;
 
+extern int LOAD_UNFILTERED;
+
 void particles_load(void) {
 	particles = mem_bump(sizeof(particle_t) * PARTICLES_MAX);
+	LOAD_UNFILTERED = 1;
 	particle_textures = image_get_compressed_textures("wipeout/common/effects.cmp");
+	LOAD_UNFILTERED = 0;
 	particles_init();
 }
 
@@ -38,7 +42,7 @@ void particles_draw(void) {
 		return;
 	}
 
-	render_set_model_mat(&mat4_identity());
+	render_set_model_ident();
 	render_set_depth_write(false);
 	render_set_blend_mode(RENDER_BLEND_LIGHTER);
 	render_set_depth_offset(-32.0);

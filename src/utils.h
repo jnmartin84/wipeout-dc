@@ -49,17 +49,10 @@
 	printf("\n"); \
 	exit(1)
 
-//#if WIPEOUT_DEBUG
-
 #define error_if(TEST, ...) \
 	if (TEST) { \
 		die(__VA_ARGS__); \
 	}
-
-//#else
-//#define error_if(TEST, ...) 
-//	;
-//#endif
 
 #define flags_add(FLAGS, F)  (FLAGS |= (F))
 #define flags_rm(FLAGS, F)   (FLAGS &= ~(F))
@@ -68,8 +61,6 @@
 #define flags_not(FLAGS, F)  ((FLAGS & (F)) != (F))
 #define flags_none(FLAGS, F) ((FLAGS & (F)) == 0)
 #define flags_set(FLAGS, F)  (FLAGS = (F))
-
-	
 
 char *get_path(const char *dir, const char *file);
 bool str_starts_with(const char *haystack, const char *needle);

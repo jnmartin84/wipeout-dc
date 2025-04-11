@@ -71,7 +71,7 @@ void scene_load(const char *base_path, float sky_y_offset) {
 
 	Object *obj = scene_objects;
 	while (obj) {
-		mat4_set_translation(&obj->mat, obj->origin);
+		mat4_set_translation(obj->mat, obj->origin);
 
 		if (str_starts_with(obj->name, "start")) {
 			error_if(start_booms_len >= SCENE_START_BOOMS_MAX, "SCENE_START_BOOMS_MAX reached");
@@ -121,20 +121,76 @@ void scene_update(void) {
 		scene_update_aurora_borealis();
 	}
 }
-
+extern pvr_poly_hdr_t chdr_opnotex;
+extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
 int sky_done = 0;
 extern pvr_dr_state_t dr_state;
 extern float RDSQ;
 int in_sky = 0;
+extern int letterbox;
 void scene_draw(camera_t *camera) {
 	// Sky
 	render_set_depth_write(false);
-	mat4_set_translation(&sky_object->mat, vec3_add(camera->position, sky_offset));
+	mat4_set_translation(sky_object->mat, vec3_add(camera->position, sky_offset));
 	in_sky = 1;
-	object_draw(sky_object, &sky_object->mat);
+	object_draw(sky_object, sky_object->mat);
 	in_sky = 0;
 	render_set_depth_write(true);
+	if(letterbox) {
+		pvr_prim(&chdr_opnotex, 32);
 
+		vs[0].x = 0;
+		vs[0].y = 60;
+		vs[0].z = 20;
+		vs[0].argb = 0xff000000;
+		vs[0].oargb = 0;
+
+		vs[1].x = 0;
+		vs[1].y = 0;
+		vs[1].z = 20;
+		vs[1].argb = 0xff000000;
+		vs[1].oargb = 0;
+
+		vs[2].x = 640;
+		vs[2].y = 60;
+		vs[2].argb = 0xff000000;
+		vs[2].z = 20;
+		vs[2].oargb = 0;
+
+		vs[3].x = 640;
+		vs[3].y = 0;
+		vs[3].z = 20;
+		vs[3].argb = 0xff000000;
+		vs[3].oargb = 0;
+
+		pvr_prim(vs, 128);
+
+		vs[0].x = 0;
+		vs[0].y = 480;
+		vs[0].z = 20;
+		vs[0].argb = 0xff000000;
+		vs[0].oargb = 0;
+
+		vs[1].x = 0;
+		vs[1].y = 420;
+		vs[1].z = 20;
+		vs[1].argb = 0xff000000;
+		vs[1].oargb = 0;
+
+		vs[2].x = 640;
+		vs[2].y = 480;
+		vs[2].argb = 0xff000000;
+		vs[2].z = 20;
+		vs[2].oargb = 0;
+
+		vs[3].x = 640;
+		vs[3].y = 420;
+		vs[3].z = 20;
+		vs[3].argb = 0xff000000;
+		vs[3].oargb = 0;
+
+		pvr_prim(vs, 128);
+	}
 	// sky rendering uses open OP list
 	// close it and open TR for everything else
 	pvr_list_finish();
@@ -142,7 +198,8 @@ void scene_draw(camera_t *camera) {
 	pvr_dr_init(&dr_state);
 
 	// Objects
-
+	float drawdist = g.track.sections[g.ships[g.pilot].section_num].scenedist;
+	//render_reset_proj(drawdist);
 	// Calculate the camera forward vector, so we can cull everything that's
 	// behind. Ideally we'd want to do a full frustum culling here. FIXME.
 	vec3_t cam_pos = camera->position;
@@ -154,10 +211,10 @@ void scene_draw(camera_t *camera) {
 		float cam_dot = vec3_dot(diff, cam_dir);
 		float dist_sq = vec3_dot(diff, diff);
 		if (
-			cam_dot < object->radius && 
-			dist_sq < RDSQ 
+			cam_dot < object->radius &&
+			dist_sq < drawdist
 		) {
-			object_draw(object, &object->mat);
+			object_draw(object, object->mat);
 		}
 
 		object = object->next;
@@ -165,9 +222,7 @@ void scene_draw(camera_t *camera) {
 }
 
 void scene_set_start_booms(int light_index) {
-	
 	int lights_len = 1;
-//	rgba_t color = rgba(0, 0, 0, 0);
 	uint32_t color = 0x00000000;
 
 	if (light_index == 0) { // reset all 3
@@ -193,9 +248,6 @@ void scene_set_start_booms(int light_index) {
 
 		for (int j = 0; j < lights_len; j++) {
 			for (int v = 0; v < 4; v++) {
-				//libPoly.gt4->color[v].r = color.r;
-				//libPoly.gt4->color[v].g = color.g;
-				//libPoly.gt4->color[v].b = color.b;
 				libPoly.gt4->color[v] = color;
 			}
 			libPoly.gt4 += 1;
@@ -210,15 +262,12 @@ void scene_pulsate_red_light(Object *obj) {
 	uint32_t color = 0xff000000 | (r << 16);
 
 	for (int v = 0; v < 4; v++) {
-		//libPoly.gt4->color[v].r = r;
-		//libPoly.gt4->color[v].g = 0x00;
-		//libPoly.gt4->color[v].b = 0x00;
 		libPoly.gt4->color[v] = color;
 	}
 }
 
 void scene_move_oil_pump(Object *pump) {
-	mat4_set_yaw_pitch_roll(&pump->mat, vec3(sinf(system_cycle_time() * 0.125 * twopi_i754), 0, 0));
+	mat4_set_yaw_pitch_roll(pump->mat, vec3(sinf(system_cycle_time() * 0.125 * twopi_i754), 0, 0));
 }
 
 void scene_init_aurora_borealis(void) {
@@ -269,32 +318,20 @@ void scene_update_aurora_borealis(void) {
 	float phase = system_time() / 30.0;
 	for (int i = 0; i < 80; i++) {
 		int16_t *coords = aurora_borealis.coords[i];
-		
-		//aurora_borealis.primitives[i]->pad1 = 1;
 
 		if (aurora_borealis.grey_coords[i] != -2) {
-			//aurora_borealis.primitives[i]->color[0].r = (sinf(coords[0] * phase) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[0].g = (sinf(coords[0] * (phase + 0.054)) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[0].b = (sinf(coords[0] * (phase + 0.039)) * 64.0) + 190;
 			aurora_borealis.primitives[i]->color[0] = packcol(rN(0), gN(0), bN(0), 0xff);
 		}
+
 		if (aurora_borealis.grey_coords[i] != -2) {
-			//aurora_borealis.primitives[i]->color[1].r = (sinf(coords[1] * phase) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[1].g = (sinf(coords[1] * (phase + 0.054)) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[1].b = (sinf(coords[1] * (phase + 0.039)) * 64.0) + 190;
 			aurora_borealis.primitives[i]->color[1] = packcol(rN(1), gN(1), bN(1), 0xff);
 		}
+
 		if (aurora_borealis.grey_coords[i] != -1) {
-			//aurora_borealis.primitives[i]->color[2].r = (sinf(coords[2] * phase) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[2].g = (sinf(coords[2] * (phase + 0.054)) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[2].b = (sinf(coords[2] * (phase + 0.039)) * 64.0) + 190;
 			aurora_borealis.primitives[i]->color[2] = packcol(rN(2), gN(2), bN(2), 0xff);
 		}
 
 		if (aurora_borealis.grey_coords[i] != -1) {
-			//aurora_borealis.primitives[i]->color[3].r = (sinf(coords[3] * phase) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[3].g = (sinf(coords[3] * (phase + 0.054)) * 64.0) + 190;
-			//aurora_borealis.primitives[i]->color[3].b = (sinf(coords[3] * (phase + 0.039)) * 64.0) + 190;
 			aurora_borealis.primitives[i]->color[3] = packcol(rN(3), gN(3), bN(3), 0xff);
 		}
 	}

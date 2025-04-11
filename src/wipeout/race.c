@@ -25,7 +25,7 @@
 
 int in_race = 0;
 
-static bool is_paused = false;
+bool is_paused = false;
 static bool menu_is_scroll_text = false;
 static bool has_show_credits = false;
 static float attract_start_time;
@@ -38,20 +38,19 @@ void race_init(void) {
 	const circut_settings_t *cs = &def.circuts[g.circut].settings[g.race_class];
 	track_load(cs->path);
 	scene_load(cs->path, cs->sky_y_offset);
-	
+
 	if (g.circut == CIRCUT_SILVERSTREAM && g.race_class == RACE_CLASS_RAPIER) {
-		scene_init_aurora_borealis();	
-	} 
+		scene_init_aurora_borealis();
+	}
 
 	race_start();
-	// render_textures_dump("texture_atlas.png");
 
 	if (g.is_attract_mode) {
 		attract_start_time = system_time();
 		for (int i = 0; i < len(g.ships); i++) {
-			// FIXME: this is needed to initializes the engine sound. Should 
+			// FIXME: this is needed to initializes the engine sound. Should
 			// maybe be done in a separate step?
-			ship_ai_update_intro(&g.ships[i]); 
+			ship_ai_update_intro(&g.ships[i]);
 
 			g.ships[i].update_func = ship_ai_update_race;
 			flags_rm(g.ships[i].flags, SHIP_VIEW_INTERNAL);
@@ -68,6 +67,7 @@ void race_init(void) {
 
 	is_paused = false;
 }
+
 extern int no_fade;
 int menu_overlay = 0;
 extern int sprites_to_draw;
@@ -113,7 +113,7 @@ void race_update(void) {
 	render_set_view(g.camera.position, g.camera.angle);
 
 	render_set_cull_backface(false);
-	scene_draw(&g.camera);	
+	scene_draw(&g.camera);
 	track_draw(&g.camera);
 	render_set_cull_backface(true);
 
@@ -124,7 +124,7 @@ void race_update(void) {
 
 	// deferred trees and other things
 	if (sprites_to_draw) {
-		render_set_depth_write(false);		
+		render_set_depth_write(false);
 		draw_all_sprites();
 		render_set_depth_write(true);
 	}
@@ -148,13 +148,21 @@ void race_update(void) {
 		menu_update(active_menu);
 	}
 }
+
 extern void wav_volume(int vol);
+
 void race_start(void) {
 	in_race = 1;
-//	wav_volume(192 * save.music_volume);
 	active_menu = NULL;
 	sfx_reset();
 	scene_init();
+	if (g.circut == CIRCUT_TERRAMAX) {
+		render_reset_proj(256000.0f);
+	} else if (g.circut == CIRCUT_ALTIMA_VII) {
+		render_reset_proj(128000.0f);
+	} else {
+		render_reset_proj(96000.0f);
+	}
 	camera_init(&g.camera, g.track.sections);
 	g.camera.update_func = camera_update_race_intro;
 	ships_init(g.track.sections);

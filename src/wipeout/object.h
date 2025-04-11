@@ -338,9 +338,9 @@ typedef struct InfiniteLight {
 typedef struct Object {
 	char name[16];
 
-	mat4_t mat;
+	mat4_t *mat;
 	int16_t vertices_len; // Number of Vertices
-	vec3_t *vertices; // Pointer to 3D Points
+	vector_t *vertices; // Pointer to 3D Points
 
 	int16_t normals_len; // Number of Normals
 	vec3_t *normals; // Pointer to 3D Normals
@@ -353,6 +353,8 @@ typedef struct Object {
 	int16_t flags; // Next object in list
 	float radius;
 	struct Object *next; // Next object in list
+
+	vector_t *xform;
 }  Object;
 
 typedef union Prm {

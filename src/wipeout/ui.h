@@ -10,8 +10,8 @@ typedef enum {
 	UI_SIZE_MAX
 } ui_text_size_t;
 
-#define UI_COLOR_ACCENT rgba(123, 98, 12, 255)
-#define UI_COLOR_DEFAULT rgba(128, 128, 128, 255)
+#define UI_COLOR_ACCENT rgba(123*2 -1, 98*2 -1, 12*2 -1, 255)
+#define UI_COLOR_DEFAULT rgba(128*2-1, 128*2-1, 128*2 -1, 255)
 
 typedef enum {
 	UI_ICON_HAND,

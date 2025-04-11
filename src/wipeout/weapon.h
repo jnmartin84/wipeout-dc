@@ -1,6 +1,30 @@
 #ifndef WEAPON_H
 #define WEAPON_H
 
+typedef struct weapon_t {
+	float timer;
+	ship_t *owner;
+	ship_t *target;
+	section_t *section;
+	Object *model;
+	bool active;
+
+	int16_t trail_particle;
+	int16_t track_hit_particle;
+	int16_t ship_hit_particle;
+	float trail_spawn_timer;
+
+	int16_t type;
+	vec3_t acceleration;
+	vec3_t velocity;
+	vec3_t position;
+	vec3_t angle;
+	float drag;
+
+	void (*update_func)(struct weapon_t *);
+} weapon_t;
+
+
 #define WEAPONS_MAX 64
 
 #define WEAPON_MINE_DURATION (450 * (1.0/30.0))
@@ -38,8 +62,8 @@
 
 #define WEAPON_CLASS_ANY 1
 #define WEAPON_CLASS_PROJECTILE 2
-
-
+extern weapon_t *weapons;
+extern int weapons_active;
 void weapons_load(void);
 void weapons_init(void);
 void weapons_fire(ship_t *ship, int weapon_type);

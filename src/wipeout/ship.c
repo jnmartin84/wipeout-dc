@@ -150,7 +150,8 @@ void ships_reset_exhaust_plumes(void) {
 }
 
 void ships_draw(void) {
-        uint8_t draw_this = 0;
+
+	uint8_t draw_this = 0;
 
 	// Ship models
 	render_set_depth_write(true);
@@ -167,9 +168,9 @@ void ships_draw(void) {
 		if (i == g.pilot) {
 			draw_this |= (1 << i);
 		} else {
-			int distance = 12;
+			int distance = 20;
 			int sc = g.track.section_count;
-			if ((g.ships[i].section->num >= 0) && (g.ships[g.pilot].section->num >= 0)) {
+			if ((g.ships[i].section->num > 0) && (g.ships[g.pilot].section->num > 0)) {
 				distance = abs(g.ships[i].section->num - g.ships[g.pilot].section->num);
 			} else if (g.ships[g.pilot].section->num == 0) {
 				distance = sc - g.ships[g.pilot].section->num;
@@ -177,7 +178,7 @@ void ships_draw(void) {
 				distance = sc - g.ships[i].section->num;
 			}
 
-			if (distance < 12) {
+			if (distance < 20) {
 				draw_this |= (1 << i);
 			}
 		}
@@ -185,9 +186,8 @@ void ships_draw(void) {
 		ship_draw(&g.ships[i], draw_this & (1 << i));
 	}
 
-
 	// Shadows
-	render_set_model_mat(&mat4_identity());
+	render_set_model_ident();
 
 	render_set_depth_write(false);
 	render_set_depth_offset(-32.0);
@@ -207,12 +207,6 @@ void ships_draw(void) {
 	render_set_depth_offset(0.0);
 	render_set_depth_write(true);
 }
-
-
-
-
-
-
 
 void ship_init(ship_t *self, section_t *section, int pilot, int inv_start_rank) {
 	self->pilot = pilot;
@@ -234,7 +228,10 @@ void ship_init(ship_t *self, section_t *section, int pilot, int inv_start_rank) 
 	self->ebolt_timer = 0;
 	self->revcon_timer = 0;
 	self->special_timer = 0;
-	self->mat = mat4_identity();
+	self->weapon_target = NULL;
+	void *om = mem_bump(sizeof(mat4_t) + 32);
+	self->mat = (mat4_t *)(((uintptr_t)om + 31) & ~31);
+	self->mat->cols[0][0] = self->mat->cols[1][1] = self->mat->cols[2][2] = self->mat->cols[3][3] = 1.0f;
 
 	self->update_timer = 0;
 	self->last_impact_time = 0;
@@ -276,7 +273,7 @@ void ship_init(ship_t *self, section_t *section, int pilot, int inv_start_rank) 
 	if ((inv_start_rank % 2) != 0) {
 		face++;
 	}
-	
+
 	vec3_t face_point;// = vec3_mulf(vec3_add(face->tris[0].vertices[0].pos, face->tris[0].vertices[2].pos), 0.5);
 	float fpx,fpy,fpz;
 	fpx = face->tris[0].vertices[0].x + face->tris[0].vertices[2].x;
@@ -395,7 +392,6 @@ void ship_init_exhaust_plume(ship_t *self) {
 		}
 	}
 
-
 	// get out the center vertex
 
 	self->exhaust_plume[0].v = NULL;
@@ -428,8 +424,10 @@ void ship_init_exhaust_plume(ship_t *self) {
 
 	for (int j = 0; j < 3; j++) {
 		if (shared[j] != -1) {
-			self->exhaust_plume[j].v = &self->model->vertices[shared[j]];
-			self->exhaust_plume[j].initial = self->model->vertices[shared[j]];
+			self->exhaust_plume[j].v = (vec3_t *)&self->model->vertices[shared[j]];
+			self->exhaust_plume[j].initial.x  = self->model->vertices[shared[j]].x;
+			self->exhaust_plume[j].initial.y  = self->model->vertices[shared[j]].y;
+			self->exhaust_plume[j].initial.z  = self->model->vertices[shared[j]].z;
 		}
 	}
 }
@@ -445,21 +443,20 @@ void ship_reset_exhaust_plume(ship_t* self)
 	}
 }
 
-
 void ship_draw(ship_t *self, int psec) {
-        if (!psec)
-                return;
+	if (!psec)
+		return;
 
-        object_draw(self->model, &self->mat);
+	object_draw(self->model, self->mat);
 }
 #include <kos.h>
 extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
 
 void ship_draw_shadow(ship_t *self, int psec) {
-        if (!psec)
-                return;
+	if (!psec)
+		return;
 
-        track_face_t *face = track_section_get_base_face(self->section);
+	track_face_t *face = track_section_get_base_face(self->section);
 
 	vec3_t face_point = vec3(face->tris[0].vertices[0].x,face->tris[0].vertices[0].y,face->tris[0].vertices[0].z);
 	vec3_t nose = vec3_add(self->position, vec3_mulf(self->dir_forward, 384));
@@ -507,7 +504,6 @@ void ship_draw_shadow(ship_t *self, int psec) {
 }
 
 void ship_update(ship_t *self) {
-
 	// Set Unit vectors of this ship
 	float sx = sinf(self->angle.x);
 	float cx = cosf(self->angle.x);
@@ -531,10 +527,10 @@ void ship_update(ship_t *self) {
 	self->prev_section = self->section;
 
 	// To find the nearest section to the ship, the original source de-emphasizes
-	// the .y component when calculating the distance to each section by a 
+	// the .y component when calculating the distance to each section by a
 	// >> 2 shift. I.e. it tries to find the section that is more closely to the
-	// horizontal x,z plane (directly underneath the ship), instead of finding 
-	// the section with the "real" closest distance. Hence the bias of 
+	// horizontal x,z plane (directly underneath the ship), instead of finding
+	// the section with the "real" closest distance. Hence the bias of
 	// vec3(1, 0.25, 1) here.
 	float distance;
 	self->section = track_nearest_section(self->position, vec3(1, 0.25, 1), self->section, &distance);
@@ -553,9 +549,8 @@ void ship_update(ship_t *self) {
 	track_face_t *face = track_section_get_base_face(self->section);
 
 	vec3_t to_face_vector = vec3(face->tris[0].vertices[0].x - face->tris[0].vertices[1].x,
-face->tris[0].vertices[0].y - face->tris[0].vertices[1].y,
-face->tris[0].vertices[0].z - face->tris[0].vertices[1].z
-	);
+		face->tris[0].vertices[0].y - face->tris[0].vertices[1].y,
+		face->tris[0].vertices[0].z - face->tris[0].vertices[1].z);
 //	vec3_sub(
 //		face->tris[0].vertices[0].pos,
 //		face->tris[0].vertices[1].pos
@@ -593,10 +588,9 @@ face->tris[0].vertices[0].z - face->tris[0].vertices[1].z
 	}
 
 	self->last_impact_time += system_tick();
-	
+
 	// Call the active player/ai update function
 	(self->update_func)(self);
-
 
 	// Animate the exhaust plume
 
@@ -620,13 +614,11 @@ face->tris[0].vertices[0].z - face->tris[0].vertices[1].z
 		}
 	}
 
-	mat4_set_translation(&self->mat, self->position);
-	mat4_set_yaw_pitch_roll(&self->mat, self->angle);
-
-
+	mat4_set_translation(self->mat, self->position);
+	mat4_set_yaw_pitch_roll(self->mat, self->angle);
 
 	// Race position and lap times
-	
+
 	self->lap_time += system_tick();
 
 	int start_line_pos = def.circuts[g.circut].settings[g.race_class].start_line_pos;
@@ -672,7 +664,6 @@ vec3_t ship_cockpit(ship_t *self) {
 
 vec3_t ship_nose(ship_t *self) {
 	return vec3_add(self->position, vec3_mulf(self->dir_forward, 512));
-	
 }
 
 vec3_t ship_wing_left(ship_t *self) {
@@ -713,7 +704,7 @@ static bool vec3_is_on_face(vec3_t pos, track_face_t *face, float alpha) {
 
 	vec3_t vec3 = vec3_sub(plane_point, facev);//face->tris[1].vertices[0].pos);
 
-	float angle = 
+	float angle =
 		vec3_angle(vec0, vec2) +
 		vec3_angle(vec2, vec3) +
 		vec3_angle(vec3, vec1) +
@@ -740,7 +731,7 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 		wing_pos = vec3_add(self->position, vec3_mulf(vec3_sub(self->dir_right, self->dir_forward), 256)); // >> 4??
 	}
 	else {
-		self->angular_velocity.z -= magnitude;	
+		self->angular_velocity.z -= magnitude;
 		wing_pos = vec3_sub(self->position, vec3_mulf(vec3_sub(self->dir_right, self->dir_forward), 256)); // >> 4??
 	}
 
@@ -764,7 +755,7 @@ void ship_resolve_nose_collision(ship_t *self, track_face_t *face, float directi
 	if (direction > 0) {
 		self->angular_velocity.y += magnitude;
 	}
-	else { 
+	else {
 		self->angular_velocity.y -= magnitude;
 	}
 
@@ -801,11 +792,11 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 	face--;
 
 	// Check against left hand side of track
-	
+
 	// FIXME: the collision checks in junctions are very flakey and often select
 	// the wrong face to test for a collision.
-	// Instead of this whole mess here, there should just be a function 
-	// `track_get_nearest_face(section, pos)` that we call with the nose and 
+	// Instead of this whole mess here, there should just be a function
+	// `track_get_nearest_face(section, pos)` that we call with the nose and
 	// wing positions and then just resolve against this face.
 
 	if (to_face > 0) {
@@ -850,7 +841,7 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 		alpha = vec3_distance_to_plane(ship_wing_left(self), face_point, face->normal);
 		if (alpha <= 0) {
 			if (
-				flags_is(self->section->flags, SECTION_JUNCTION_START) || 
+				flags_is(self->section->flags, SECTION_JUNCTION_START) ||
 				flags_is(self->section->flags, SECTION_JUNCTION_END)
 			) {
 				collide = vec3_is_on_face(ship_wing_left(self), face, alpha);
@@ -929,7 +920,7 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 			}
 			return;
 		}
-		
+
 		alpha = vec3_distance_to_plane(ship_wing_left(self), face_point, face->normal);
 		if (alpha <= 0) {
 			if (
@@ -970,10 +961,11 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 bool ship_intersects_ship(ship_t *self, ship_t *other) {
 	// Get 4 points of collision model relative to the
 	// camera
-	vec3_t a = vec3_transform(other->collision_model->vertices[0], &other->mat);
-	vec3_t b = vec3_transform(other->collision_model->vertices[1], &other->mat);
-	vec3_t c = vec3_transform(other->collision_model->vertices[2], &other->mat);
-	vec3_t d = vec3_transform(other->collision_model->vertices[3], &other->mat);
+	mat_load(&other->mat->cols);
+	vec3_t a = vector_transform(other->collision_model->vertices[0]);
+	vec3_t b = vector_transform(other->collision_model->vertices[1]);
+	vec3_t c = vector_transform(other->collision_model->vertices[2]);
+	vec3_t d = vector_transform(other->collision_model->vertices[3]);
 
 	vec3_t other_points[6] = {b, a, d, a, a, b};
 	vec3_t other_lines[6] = {
@@ -985,42 +977,41 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 		vec3_sub(d, b)
 	};
 
-
 	Prm poly = {.primitive = other->collision_model->primitives};
 	int primitives_len = other->collision_model->primitives_len;
 
 	vec3_t p1, p2, p3;
-
+	mat_load(&self->mat->cols);
 	// for all 4 planes of the enemy ship
 	for (int pi = 0; pi < primitives_len; pi++) {
 		int16_t *indices;
 		switch (poly.primitive->type) {
 			case PRM_TYPE_F3:
 				indices = poly.f3->coords;
-				p1 =  vec3_transform(self->collision_model->vertices[indices[0]], &self->mat);
-				p2 =  vec3_transform(self->collision_model->vertices[indices[1]], &self->mat);
-				p3 =  vec3_transform(self->collision_model->vertices[indices[2]], &self->mat);
+				p1 =  vector_transform(self->collision_model->vertices[indices[0]]);
+				p2 =  vector_transform(self->collision_model->vertices[indices[1]]);
+				p3 =  vector_transform(self->collision_model->vertices[indices[2]]);
 				poly.f3++;
 				break;
 			case PRM_TYPE_G3:
 				indices = poly.g3->coords;
-				p1 =  vec3_transform(self->collision_model->vertices[indices[0]], &self->mat);
-				p2 =  vec3_transform(self->collision_model->vertices[indices[1]], &self->mat);
-				p3 =  vec3_transform(self->collision_model->vertices[indices[2]], &self->mat);
+				p1 =  vector_transform(self->collision_model->vertices[indices[0]]);
+				p2 =  vector_transform(self->collision_model->vertices[indices[1]]);
+				p3 =  vector_transform(self->collision_model->vertices[indices[2]]);
 				poly.g3++;
 				break;
 			case PRM_TYPE_FT3:
 				indices = poly.ft3->coords;
-				p1 =  vec3_transform(self->collision_model->vertices[indices[0]], &self->mat);
-				p2 =  vec3_transform(self->collision_model->vertices[indices[1]], &self->mat);
-				p3 =  vec3_transform(self->collision_model->vertices[indices[2]], &self->mat);
+				p1 =  vector_transform(self->collision_model->vertices[indices[0]]);
+				p2 =  vector_transform(self->collision_model->vertices[indices[1]]);
+				p3 =  vector_transform(self->collision_model->vertices[indices[2]]);
 				poly.ft3++;
 				break;
 			case PRM_TYPE_GT3:
 				indices = poly.gt3->coords;
-				p1 =  vec3_transform(self->collision_model->vertices[indices[0]], &self->mat);
-				p2 =  vec3_transform(self->collision_model->vertices[indices[1]], &self->mat);
-				p3 =  vec3_transform(self->collision_model->vertices[indices[2]], &self->mat);
+				p1 =  vector_transform(self->collision_model->vertices[indices[0]]);
+				p2 =  vector_transform(self->collision_model->vertices[indices[1]]);
+				p3 =  vector_transform(self->collision_model->vertices[indices[2]]);
 				poly.gt3++;
 				break;
 			default:
@@ -1037,8 +1028,9 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 		for (int vi = 0; vi < 6; vi++) {
 			float dp1 = vec3_dot(vec3_sub(p1, other_points[vi]), plane1);
 			float dp2 = vec3_dot(other_lines[vi], plane1);
-			
+
 			if (dp2 != 0) {
+				// todo - is it possible dp2 can be < 0? should find out
 				float norm = dp1 * approx_recip(dp2);// / dp2;
 
 				if ((norm >= 0) && (norm <= 1)) {
@@ -1048,7 +1040,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 					vec3_t v0 = vec3_sub(p1, res);
 					vec3_t v1 = vec3_sub(p2, res);
 					vec3_t v2 = vec3_sub(p3, res);
-					
+
 					float angle =
 						vec3_angle(v0, v1) +
 						vec3_angle(v1, v2) +
@@ -1067,7 +1059,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 
 void ship_collide_with_ship(ship_t *self, ship_t *other) {
 	float distance = vec3_len(vec3_sub(self->position, other->position));
-	
+
 	// Do a quick distance check; if ships are far apart, remove the collision flag
 	// and early out.
 	if (distance > 960) {
@@ -1110,7 +1102,7 @@ void ship_collide_with_ship(ship_t *self, ship_t *other) {
 	other->position = vec3_add(other->position, vec3_mulf(other->velocity, 0.015625f)); // >> 6
 
 	if (
-		flags_not(self->flags, SHIP_COLL) && 
+		flags_not(self->flags, SHIP_COLL) &&
 		flags_not(other->flags, SHIP_COLL) &&
 		self->last_impact_time > 0.2f
 	) {

@@ -41,6 +41,31 @@ typedef enum {
 	A_MENU_QUIT,
 } action_t;
 
+static inline char *action_string(action_t action) {
+	switch (action) {
+		case A_UP:
+			return "A_UP";
+		case A_DOWN:
+			return "A_DOWN";
+		case A_LEFT:
+			return "A_LEFT";
+		case A_RIGHT:
+			return "A_RIGHT";
+		case A_BRAKE_LEFT:
+			return "A_BRAKE_LEFT";
+		case A_BRAKE_RIGHT:
+			return "A_BRAKE_RIGHT";
+		case A_THRUST:
+			return "A_THRUST";
+		case A_FIRE:
+			return "A_FIRE";
+		case A_CHANGE_VIEW:
+			return "A_CHANGE_VIEW";
+		default:
+			return "";
+	}
+}
+
 typedef enum {
 	GAME_SCENE_INTRO,
 	GAME_SCENE_TITLE,
@@ -192,7 +217,7 @@ typedef struct {
 typedef struct {
 	float frame_time;
 	float frame_rate;
-	
+
 	int race_class;
 	int race_type;
 	int highscore_tab;
@@ -208,7 +233,7 @@ typedef struct {
 	float race_time;
 	int lives;
 	int race_position;
-	
+
 	float lap_times[NUM_PILOTS][NUM_LAPS];
 	pilot_points_t race_ranks[NUM_PILOTS];
 	pilot_points_t championship_ranks[NUM_PILOTS];
@@ -252,7 +277,7 @@ typedef struct {
 
 	uint32_t has_rapier_class;
 	uint32_t has_bonus_circuts;
-	
+
 	uint8_t buttons[NUM_GAME_ACTIONS][2];
 
 	char highscores_name[4];

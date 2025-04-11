@@ -11,7 +11,7 @@ gamecontrollerdb.txt
 .vscode/
 build/
 build/*.elf
-memcpy32.o
+*.o
 *.cdi
 src/.vscode/
 src/*.o

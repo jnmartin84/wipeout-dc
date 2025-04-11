@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/time.h>
 extern uint8_t allow_exit;
-static bool wants_to_exit = false;
+static volatile /* bool */int wants_to_exit = 0;
 void *gamepad;
 char *path_assets = "";
 char *path_userdata = "";
@@ -20,7 +20,7 @@ void draw_vmu_icon(void);
 
 void platform_exit(void) {
 	if (allow_exit)
-		wants_to_exit = true;
+		wants_to_exit = 1;//true;
 }
 
 void *platform_find_gamepad(void) {
@@ -30,13 +30,10 @@ void *platform_find_gamepad(void) {
 
 #include <dc/maple.h>
 #include <dc/maple/controller.h>
-//int ssc = 0;
-//char ssfn[256];
-void render_textures_dump(const char *path);
 
 int if_to_await = 0;
 
-#define configDeadzone (0x08) // 0x20
+#define configDeadzone (0x04) // 0x20
 
 uint16_t old_buttons = 0, rel_buttons = 0;
 
@@ -52,9 +49,8 @@ void platform_pump_events()
 
  	rel_buttons = (old_buttons ^ state->buttons);
 
-	if ((state->buttons & CONT_START) && state->ltrig && state->rtrig) {
+	if ((state->buttons & CONT_START) && state->ltrig && state->rtrig)
 		platform_exit();
-	}
 
 	int last_joyx = state->joyx;
 	int last_joyy = state->joyy;
@@ -68,8 +64,8 @@ void platform_pump_events()
 	float stick_y = 0;
 
 	if (magnitude_sq > (uint32_t)(configDeadzone * configDeadzone)) {
-		stick_x = clamp(((float)last_joyx / 127.0f) * 2.0f, -1.0f, 1.0f);
-		stick_y = clamp(((float)last_joyy / 127.0f) * 2.0f, -1.0f, 1.0f);
+		stick_x = clamp(((float)last_joyx / 127.0f)/*  * 2.0f */, -1.0f, 1.0f);
+		stick_y = clamp(((float)last_joyy / 127.0f)/*  * 2.0f */, -1.0f, 1.0f);
 	}
 
 	// joystick
@@ -89,22 +85,28 @@ void platform_pump_events()
 		input_set_button_state(INPUT_GAMEPAD_L_STICK_UP, 0);
 	}
 
-	// when if_to_await is true, A and START get debounced for controller remapping menu only
+	// work-around so the remap menu is functional
 	if (if_to_await)
 		input_set_button_state(INPUT_GAMEPAD_START, (state->buttons & CONT_START) && (rel_buttons & CONT_START) ? 1.0f : 0.0f);
 	else
 		input_set_button_state(INPUT_GAMEPAD_START, (state->buttons & CONT_START) ? 1.0f : 0.0f);
 
+	// work-around so the remap menu is functional
 	if (if_to_await)
 		input_set_button_state(INPUT_GAMEPAD_A, (state->buttons & CONT_A) && (rel_buttons & CONT_A) ? 1.0f : 0.0f);
 	else
 		input_set_button_state(INPUT_GAMEPAD_A, (state->buttons & CONT_A) ? 1.0f : 0.0f);
 
 	input_set_button_state(INPUT_GAMEPAD_B, (state->buttons & CONT_B) ? 1.0f : 0.0f);
+
 	input_set_button_state(INPUT_GAMEPAD_X, (state->buttons & CONT_X) ? 1.0f : 0.0f);
+
 	input_set_button_state(INPUT_GAMEPAD_Y, (state->buttons & CONT_Y) ? 1.0f : 0.0f);
+
 	input_set_button_state(INPUT_GAMEPAD_L_TRIGGER, ((uint8_t)state->ltrig) ? 1.0f : 0.0f);
+
 	input_set_button_state(INPUT_GAMEPAD_R_TRIGGER, ((uint8_t)state->rtrig) ? 1.0f : 0.0f);
+
 	input_set_button_state(INPUT_GAMEPAD_DPAD_UP, (state->buttons & CONT_DPAD_UP) ? 1.0f : 0.0f);
 	input_set_button_state(INPUT_GAMEPAD_DPAD_DOWN, (state->buttons & CONT_DPAD_DOWN) ? 1.0f : 0.0f);
 	input_set_button_state(INPUT_GAMEPAD_DPAD_LEFT, (state->buttons & CONT_DPAD_LEFT) ? 1.0f : 0.0f);
@@ -173,28 +175,16 @@ extern const uint8_t icon1_data[512*3];
 extern void wav_volume(int vol);
 
 uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
-//	vmu_check();
-//	if (!ControllerPakStatus) {
-//		*bytes_read = 0;
-//		return NULL;
-//	}
-
 	ssize_t size;
 	maple_device_t *vmudev = NULL;
 	uint8_t *data;
 
 	ControllerPakStatus = 0;
 
-//	wav_volume(0);
-//	for (int i=0;i<1024;i++) {
-//		;
-//	}
-
 	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
 	if (!vmudev) {
 		dbgio_printf("platform_load_userdata: could not enum\n");
 		*bytes_read = 0;
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -202,7 +192,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 	if (!d) {
 		dbgio_printf("platform_load_userdata: could not fs_open %s\n", get_vmu_fn(vmudev, "wipeout.dat"));
 		*bytes_read = 0;
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -213,7 +202,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		fs_close(d);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: could not calloc data\n");
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -225,7 +213,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		fs_close(d);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: could not fs_read\n");
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 	ssize_t total = res;
@@ -235,7 +222,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 			fs_close(d);
 			*bytes_read = 0;
 			dbgio_printf("platform_load_userdata: could not fs_read\n");
-//			wav_volume(224 * save.music_volume);
 			return NULL;
 		}
 		total += res;
@@ -245,7 +231,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		fs_close(d);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: total != size\n");
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -255,7 +240,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		free(data);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: could not vmu_pkg_parse\n");
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -264,7 +248,6 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		free(data);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: could not mem_temp_alloc bytes\n");
-//		wav_volume(224 * save.music_volume);
 		return NULL;
 	}
 
@@ -274,10 +257,9 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 
 	*bytes_read = pkg.data_len;
 
-//	wav_volume(224 * save.music_volume);
-
 	return bytes;
 }
+
 #define USERDATA_BLOCK_COUNT 6
 
 uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
@@ -285,24 +267,11 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 	ssize_t pkg_size;
 	maple_device_t *vmudev = NULL;
 
-//	wav_volume(0);
-//	for (int i=0;i<1024;i++) {
-//		;
-//	}
-
-	//vmu_check();
-	//if (!ControllerPakStatus) {
-//		wav_volume(224 * save.music_volume);
-//		dbgio_printf("platform_load_userdata: could not mem_temp_alloc bytes\n");
-//		return 0;
-//	}
-
 	ControllerPakStatus = 0;
 
 	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
 	if (!vmudev) {
 		dbgio_printf("platform_store_userdata: could not enum\n");
-//		wav_volume(224 * save.music_volume);
 		return 0;
 	}
 
@@ -327,24 +296,21 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 		}
 		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDWR | O_CREAT);
 		if (!d) {
-			dbgio_printf("platform_store_userdata: cant open wipeout for rdwr|creat\n");			
-//			wav_volume(224 * save.music_volume);
+			dbgio_printf("platform_store_userdata: cant open wipeout for rdwr|creat\n");
 			return 0;
 		}
 	} else {
 		fs_close(d);
 		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_WRONLY);
 		if (!d) {
-			dbgio_printf("platform_store_userdata: could not open file\n");			
-//			wav_volume(224 * save.music_volume);
+			dbgio_printf("platform_store_userdata: could not open file\n");
 			return 0;
 		}
 	}
 
 	vmu_pkg_build(&pkg, &pkg_out, &pkg_size);
 	if (!pkg_out || pkg_size <= 0) {
-		dbgio_printf("platform_store_userdata: vmu_pkg_build failed\n");		
-//		wav_volume(224 * save.music_volume);
+		dbgio_printf("platform_store_userdata: vmu_pkg_build failed\n");
 		fs_close(d);
 		return 0;
 	}
@@ -355,7 +321,6 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 		rv = fs_write(d, pkg_out + total, pkg_size - total);
 		if (rv < 0) {
 			dbgio_printf("platform_store_userdata: could not fs_write\n");
-//			wav_volume(224 * save.music_volume);
 			fs_close(d);
 			return -2;
 		}
@@ -366,8 +331,6 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 
 	free(pkg_out);
 
-//	wav_volume(224 * save.music_volume);
-
 	if (total == pkg_size) {
 		ControllerPakStatus = 1;
 		return len;
@@ -376,29 +339,29 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 	}
 }
 
-	#define PLATFORM_WINDOW_FLAGS 0
-	static vec2i_t screen_size = vec2i(0, 0);
+#define PLATFORM_WINDOW_FLAGS 0
 
-	void platform_video_init(void) {
-	}
+extern	vec2i_t screen_size;
 
-	void platform_video_cleanup(void) {
-	}
+void platform_video_init(void) {
+}
 
-	void platform_prepare_frame(void) {
-	}
+void platform_video_cleanup(void) {
+}
 
-	void platform_end_frame(void) {
-	}
+void platform_prepare_frame(void) {
+}
 
-	rgba_t *platform_get_screenbuffer(int32_t *pitch) {
-		return NULL;
-	}
+void platform_end_frame(void) {
+}
 
-	vec2i_t platform_screen_size(void) {
-		screen_size = vec2i(640,480);
-		return screen_size;
-	}
+rgba_t *platform_get_screenbuffer(int32_t *pitch) {
+	return NULL;
+}
+
+vec2i_t platform_screen_size(void) {
+	return screen_size;
+}
 
 #include <kos.h>
 
@@ -423,8 +386,8 @@ int main(int argc, char *argv[]) {
 			path_userdata = "/pc/wipeout";
 			allow_exit = 1;
 		} else {
-		printf("CANT FIND ASSETS ON /PC or /CD; TERMINATING!\n");
-		exit(-1);
+			printf("CANT FIND ASSETS ON /PC or /CD; TERMINATING!\n");
+			exit(-1);
 		}
 	}
 	if (snd_stream_init() < 0)
@@ -435,17 +398,6 @@ int main(int argc, char *argv[]) {
 	// Reserve some space for concatenating the asset and userdata paths with
 	// local filenames.
 	temp_path = mem_bump(max(strlen(path_assets), strlen(path_userdata)) + 64);
-
-	// Load gamecontrollerdb.txt if present.
-	// FIXME: Should this load from userdata instead?
-//	char *gcdb_path = strcat(strcpy(temp_path, path_assets), "gamecontrollerdb.txt");
-//	int gcdb_res = SDL_GameControllerAddMappingsFromFile(gcdb_path);
-//	if (gcdb_res < 0) {
-//		printf("Failed to load gamecontrollerdb.txt\n");
-//	}
-//	else {
-//		printf("load gamecontrollerdb.txt\n");
-//	}
 
 	gamepad = platform_find_gamepad();
 

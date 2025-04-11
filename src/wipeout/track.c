@@ -150,8 +150,8 @@ void track_load_faces(char *file_name, vec3_t *vertices) {
 
 	g.track.face_count = size / 20; // TRACK_FACE_DATA_SIZE
 	g.track.faces = mem_bump(sizeof(track_face_t) * g.track.face_count);
-	g.track.pvr = mem_bump((sizeof(pvr_vertex_t) * 4 * g.track.face_count) + 32);
-	g.track.apvr = (pvr_vertex_t *)(((uintptr_t)g.track.pvr + 31) & ~31);
+	void *trackpvr = mem_bump((sizeof(pvr_vertex_t) * 4 * g.track.face_count) + 32);
+	g.track.apvr = (pvr_vertex_t *)(((uintptr_t)trackpvr + 31) & ~31);
 
 	uint32_t p = 0;
 	track_face_t *tf = g.track.faces;
@@ -293,7 +293,6 @@ void track_load_faces(char *file_name, vec3_t *vertices) {
 	mem_temp_free(bytes);
 }
 
-
 void track_load_sections(char *file_name) {
 	uint32_t size;
 	uint8_t *bytes = platform_load_asset(file_name, &size);
@@ -304,6 +303,120 @@ void track_load_sections(char *file_name) {
 	uint32_t p = 0;
 	section_t *ts = g.track.sections;
 	for (int i = 0; i < g.track.section_count; i++) {
+			#define DEFAULT_LOW_DISTSQ (float)(64000.0f * 64000.0f)
+			#define DEFAULT_MED_DISTSQ (float)(76000.0f * 76000.0f)
+			#define DEFAULT_HIGH_DISTSQ (float)(96000.0f * 96000.0f)
+			#define DEFAULT_XHIGH_DISTSQ (float)(120000.0f * 120000.0f)
+			#define DEFAULT_XXHIGH_DISTSQ (float)(256000.0f * 256000.0f)
+		if (g.circut == CIRCUT_KARBONIS_V) {
+			if (i >= 179 && i <= 219) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		} else if (g.circut == CIRCUT_TERRAMAX) {
+			if (i >= 0 && i <= 32) {
+				ts->drawdist = DEFAULT_XXHIGH_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		}
+		// korodera sections
+		else if (g.circut == CIRCUT_KORODERA) {
+			if (i >= 125 && i <= 147) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 318 && i <= 362) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 412 && i <= 436) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else if (i >= 489 && i <= 515) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		}
+		// arridos sections
+		else if (g.circut == CIRCUT_ARRIDOS_IV) {
+			if (i >= 172 && i <= 179) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else if (i >= 181 && i <= 192) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 197 && i <= 220) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 256 && i <= 286) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 295 && i <= 308) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 427 && i <= 450) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		} else if (g.circut == CIRCUT_FIRESTAR) {
+ 			if (i >= 0 && i <= 75) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else if (i >= 96 && i <= 115) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else if (i >= 380 && i <= 386) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		} else if (g.circut == CIRCUT_SILVERSTREAM) {
+			if (i == 1) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 155 && i <= 270) {
+				ts->drawdist = DEFAULT_MED_DISTSQ;
+			} else if (i == 0 || (i >= 335 && i <= 363)) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+			} else {
+				ts->drawdist = DEFAULT_HIGH_DISTSQ;
+			}
+		} else {
+			ts->drawdist = DEFAULT_HIGH_DISTSQ;
+		}
+
+		ts->scenedist = ts->drawdist;
+
+		if (g.circut == CIRCUT_ALTIMA_VII) {
+			// i want to see whatever that weird thing that extends toward the sky
+			// right before the tunnel at the end of the race
+			// also right after stands at beginning
+			if (i >= 38 && i <= 118) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+				ts->scenedist = DEFAULT_XHIGH_DISTSQ;
+			} else if (i >= 490 && i <= 540) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+				ts->scenedist = DEFAULT_XHIGH_DISTSQ;
+			} else if (i >= 541 && i <= 585) {
+				ts->drawdist = DEFAULT_LOW_DISTSQ;
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
+			}
+		} else if (g.circut == CIRCUT_ARRIDOS_IV) {
+			if (i >= 172 && i <= 179) {
+				ts->scenedist = DEFAULT_HIGH_DISTSQ;
+			} else if (i >= 181 && i <= 192) {
+				ts->scenedist = DEFAULT_HIGH_DISTSQ;
+			} else if (i >= 197 && i <= 220) {
+				ts->scenedist = DEFAULT_HIGH_DISTSQ;
+			} else if (i >= 256 && i <= 286) {
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 295 && i <= 308) {
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 427 && i <= 450) {
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
+			} else {
+				ts->scenedist = DEFAULT_HIGH_DISTSQ;
+			}
+		} else if (g.circut == CIRCUT_SILVERSTREAM) {
+ 			if (i >= 155 && i <= 270) {
+				ts->scenedist = DEFAULT_MED_DISTSQ;
+			} else if (i == 0 || (i >= 335 && i <= 363)) {
+				ts->scenedist = DEFAULT_MED_DISTSQ;
+			}
+		}
+
+		ts->base_face = NULL;
 		int32_t junction_index = get_i32(bytes, &p);
 		if (junction_index != -1) {
 			ts->junction = g.track.sections + junction_index;
@@ -330,6 +443,11 @@ void track_load_sections(char *file_name) {
 		p += 4 * 2; // high list
 		p += 4 * 2; // med list
 
+		// face start
+		// face count
+		// flags
+		// num
+
 		ts->face_start = get_i16(bytes, &p);
 		ts->face_count = get_i16(bytes, &p);
 
@@ -337,33 +455,52 @@ void track_load_sections(char *file_name) {
 		ts->radius = 0.0f;
 
 		vec3_t v0,v1,v2,v3;
-		float r0,r1,r2,r3;
+
 		for (int j=0;j<ts->face_count;j++) {
 			track_face_t *tfc = &g.track.faces[ts->face_start + j];
-			v0.x = tfc->vp[0].x;
-			v0.y = tfc->vp[0].y;
-			v0.z = tfc->vp[0].z;
+			if (flags_any(tfc->flags, FACE_TRACK_BASE)) {
+				ts->base_face = (track_face_t *)((uintptr_t)tfc - 0x100);
+			}
+			v0.x = fabsf(tfc->vp[0].x - ts->center.x);
+			v0.y = fabsf(tfc->vp[0].y - ts->center.y);
+			v0.z = fabsf(tfc->vp[0].z - ts->center.z);
 
-			v1.x = tfc->vp[1].x;
-			v1.y = tfc->vp[1].y;
-			v1.z = tfc->vp[1].z;
+			if (v0.x > ts->radius) ts->radius = v0.x;
+			if (v0.y > ts->radius) ts->radius = v0.y;
+			if (v0.z > ts->radius) ts->radius = v0.z;
 
-			v2.x = tfc->vp[2].x;
-			v2.y = tfc->vp[2].y;
-			v2.z = tfc->vp[2].z;
+			v1.x = fabsf(tfc->vp[1].x - ts->center.x);
+			v1.y = fabsf(tfc->vp[1].y - ts->center.y);
+			v1.z = fabsf(tfc->vp[1].z - ts->center.z);
 
-			v3.x = tfc->vp[3].x;
-			v3.y = tfc->vp[3].y;
-			v3.z = tfc->vp[3].z;
+			if (v1.x > ts->radius) ts->radius = v1.x;
+			if (v1.y > ts->radius) ts->radius = v1.y;
+			if (v1.z > ts->radius) ts->radius = v1.z;
 
-			r0 = vec3_len(vec3_sub(v0,ts->center));
-			r1 = vec3_len(vec3_sub(v1,ts->center));
-			r2 = vec3_len(vec3_sub(v2,ts->center));
-			r3 = vec3_len(vec3_sub(v3,ts->center));
-			if (r0 > ts->radius) ts->radius = r0;
-			if (r1 > ts->radius) ts->radius = r1;
-			if (r2 > ts->radius) ts->radius = r2;
-			if (r3 > ts->radius) ts->radius = r3;
+			v2.x = fabsf(tfc->vp[2].x - ts->center.x);
+			v2.y = fabsf(tfc->vp[2].y - ts->center.y);
+			v2.z = fabsf(tfc->vp[2].z - ts->center.z);
+
+			if (v2.x > ts->radius) ts->radius = v2.x;
+			if (v2.y > ts->radius) ts->radius = v2.y;
+			if (v2.z > ts->radius) ts->radius = v2.z;
+
+			v3.x = fabsf(tfc->vp[3].x - ts->center.x);
+			v3.y = fabsf(tfc->vp[3].y - ts->center.y);
+			v3.z = fabsf(tfc->vp[3].z - ts->center.z);
+
+			if (v3.x > ts->radius) ts->radius = v3.x;
+			if (v3.y > ts->radius) ts->radius = v3.y;
+			if (v3.z > ts->radius) ts->radius = v3.z;
+
+//			r0 = vec3_len(vec3_sub(v0,ts->center));
+//			r1 = vec3_len(vec3_sub(v1,ts->center));
+//			r2 = vec3_len(vec3_sub(v2,ts->center));
+//			r3 = vec3_len(vec3_sub(v3,ts->center));
+//			if (r0 > ts->radius) ts->radius = r0;
+//			if (r1 > ts->radius) ts->radius = r1;
+//			if (r2 > ts->radius) ts->radius = r2;
+//			if (r3 > ts->radius) ts->radius = r3;
 		}
 		p += 2 * 2; // global/local radius
 
@@ -377,8 +514,10 @@ void track_load_sections(char *file_name) {
 }
 
 #include <kos.h>
+
 extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
 extern void memcpy32(const void *dst, const void *src, size_t s);
+
 void track_draw_section(section_t *section) {
 	track_face_t *face = g.track.faces + section->face_start;
 	int16_t face_count = section->face_count;
@@ -394,15 +533,11 @@ void track_draw_section(section_t *section) {
 		// memcpy32 of size 128 completes in ~180 cycles
 		// around 1.4 cycles per byte
 		memcpy32(vs, vp, 128);
-
 		vp = vp + 128;
-
 		render_quad(tstart + face++->texture);
 
 		memcpy32(vs, vp, 128);
-
 		vp = vp + 128;
-
 		render_quad(tstart + face++->texture);
 	}
 
@@ -413,14 +548,16 @@ void track_draw_section(section_t *section) {
 }
 
 extern float RDSQ;
-
+extern bool is_paused;
 void track_draw(camera_t *camera) {
-	render_set_model_mat(&mat4_identity());
+	render_set_model_ident();
 
 	// Calculate the camera forward vector, so we can cull everything that's
 	// behind. Ideally we'd want to do a full frustum culling here.
 	vec3_t cam_pos = camera->position;
 	vec3_t cam_dir = camera_forward(camera);
+
+	float drawdist = g.track.sections[g.ships[g.pilot].section_num].drawdist;
 
 	for(int32_t i = 0; i < g.track.section_count; i++) {
 		section_t *s = &g.track.sections[i];
@@ -428,7 +565,7 @@ void track_draw(camera_t *camera) {
 		float cam_dot = vec3_dot(diff, cam_dir);
 		float dist_sq = vec3_dot(diff, diff);
 		if (cam_dot < s->radius &&
-			dist_sq < RDSQ //(RENDER_FADEOUT_FAR * RENDER_FADEOUT_FAR)
+			dist_sq < drawdist
 		) {
 			track_draw_section(s);
 		}
@@ -445,12 +582,10 @@ void track_cycle_pickups(void) {
 		}
 		else if (g.track.pickups[i].cooldown_timer <= 0) {
 			flags_add(g.track.pickups[i].face->flags, FACE_PICKUP_ACTIVE);
-			track_face_set_color(g.track.pickups[i].face, //rgba(
+			track_face_set_color(g.track.pickups[i].face,
 				sinf( pickup_cycle_time + i) * 127 + 128,
 				cosf( pickup_cycle_time + i) * 127 + 128,
-				sinf(-pickup_cycle_time - i) * 127 + 128
-				//255
-			);//);
+				sinf(-pickup_cycle_time - i) * 127 + 128);
 		}
 		else{
 			g.track.pickups[i].cooldown_timer -= system_tick();
@@ -463,20 +598,14 @@ void track_face_set_color(track_face_t *face, uint8_t r, uint8_t g, uint8_t b) {
 
 	face->vp[0].argb = lcol;
 	face->vp[0].oargb = lcol;
+
 	face->vp[1].argb = lcol;
-	face->vp[1].oargb = lcol;
 	face->vp[2].argb = lcol;
-	face->vp[2].oargb = lcol;
 	face->vp[3].argb = lcol;
-	face->vp[3].oargb = lcol;
 }
 
 track_face_t *track_section_get_base_face(section_t *section) {
-	track_face_t *face = g.track.faces +section->face_start;
-	while(flags_not(face->flags, FACE_TRACK_BASE)) {
-		face++;
-	}
-	return face;
+	return section->base_face;
 }
 
 section_t *track_nearest_section(vec3_t pos, vec3_t bias, section_t *section, float *distance) {
@@ -531,3 +660,4 @@ section_t *track_nearest_section(vec3_t pos, vec3_t bias, section_t *section, fl
 	}
 	return nearest_section;
 }
+

@@ -419,17 +419,17 @@ save_t save = {
 	.magic = SAVE_DATA_MAGIC,
 	.is_dirty = true,
 
-	.sfx_volume = 0.8,
-	.music_volume = 0.7,
+	.sfx_volume = 0.5,
+	.music_volume = 0.4,
 	.internal_roll = 0.6,
 	.ui_scale = 0,
-	.render_dist = 0,
+	.render_dist = 8,
 	.filter = true,
 	.fade = false,
 	.shading = true,
 	.show_fps = false,
 	.fullscreen = true,
-	.screen_res = RENDER_RES_NATIVE,
+	.screen_res = RENDER_RES_169A,
 	.post_effect = 0,
 
 	.has_rapier_class = false,  // for testing; should be false in prod
@@ -537,28 +537,25 @@ void game_init(void) {
 	uint32_t size;
 	save_t *save_file = (save_t *)platform_load_userdata("save.dat", &size);
 	if (save_file) {
-		if (size == sizeof(save_t) && save_file->magic == SAVE_DATA_MAGIC) {
-			//printf("load save data success\n");
+		if (size == sizeof(save_t) && save_file->magic == SAVE_DATA_MAGIC)
 			memcpy(&save, save_file, sizeof(save_t));
-		}
-		else {
+		else
 			printf("unexpected size/magic for save data");
-		}
+
 		mem_temp_free(save_file);
 	}
+	save.render_dist = 8;
+	save.fade = 0;
+	save.shading = 1;
 
-
+	// can we get rid of this now?
 	RENDERDIST = RENDER_FADEOUT_FAR + (4000.0f * ((float)save.render_dist * 10.f / 8.0f));
 	RDSQ = RENDERDIST * RENDERDIST;
 
 	render_set_resolution(save.screen_res);
-	platform_set_fullscreen(save.fullscreen);
-	render_set_screen_size(platform_screen_size());
-
-	render_set_post_effect(save.post_effect);
 
 	srand((int)(platform_now() * 100));
-	
+
 	ui_load();
 	sfx_load();
 	hud_load();
@@ -634,7 +631,6 @@ void game_set_scene(game_scene_t scene) {
 		// FIXME: this should probably run async somewhere
 		save.is_dirty = false;
 		platform_store_userdata("save.dat", &save, sizeof(save_t));
-//		printf("wrote save.dat\n");
 	}
 	sfx_reset();
 	scene_next = scene;
@@ -651,10 +647,9 @@ void game_reset_championship(void) {
 void game_update(void) {
 	float frame_start_time = platform_now();
 
-	int sh = render_size().y;
-	int scale = max(1, sh >=  720 ? sh / 360 : sh / 240);
-	if (save.ui_scale && save.ui_scale < scale) {
-		scale = save.ui_scale;
+	int scale = 2;
+	if (save.ui_scale) {
+		scale = 1;
 	}
 	ui_set_scale(scale);
 
@@ -676,8 +671,9 @@ void game_update(void) {
 
 	float now = platform_now();
 	g.frame_time = now - frame_start_time;
+
 	if (g.frame_time > 0) {
-		g.frame_rate = 1.0f / g.frame_time;//(1.0f / g.frame_time);//((float)g.frame_rate * 0.95f) + (1.0f/g.frame_time) * 0.05f;
+		g.frame_rate = 1.0f / g.frame_time ;
 	}
 }
 

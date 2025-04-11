@@ -11,9 +11,9 @@ typedef enum {
 } render_blend_mode_t;
 
 typedef enum {
-	RENDER_RES_NATIVE,
-	RENDER_RES_240P,
-	RENDER_RES_480P,
+	RENDER_RES_43,
+	RENDER_RES_169A,
+	RENDER_RES_169L,
 } render_resolution_t;
 
 typedef enum {
@@ -32,9 +32,10 @@ typedef enum {
 
 extern uint16_t RENDER_NO_TEXTURE;
 
-void render_init(vec2i_t screen_size);
+void render_init(void);
 void render_cleanup(void);
-
+vec2i_t render_res_to_size(render_resolution_t res);
+void render_reset_proj(float farval);
 void render_set_screen_size(vec2i_t size);
 void render_set_resolution(render_resolution_t res);
 void render_set_post_effect(render_post_effect_t post);
@@ -46,6 +47,7 @@ void render_frame_end(void);
 void render_set_view(vec3_t pos, vec3_t angles);
 void render_set_view_2d(void);
 void render_set_model_mat(mat4_t *m);
+void render_set_model_ident(void);
 void render_set_depth_write(bool enabled);
 void render_set_depth_test(bool enabled);
 void render_set_depth_offset(float offset);
@@ -53,10 +55,16 @@ void render_set_screen_position(vec2_t pos);
 void render_set_blend_mode(render_blend_mode_t mode);
 void render_set_cull_backface(bool enabled);
 
-void render_noclip_quad(uint16_t texture);
+void render_hud_quad(uint16_t texture);
 
 void render_quad(uint16_t texture);
 void render_tri(uint16_t texture);
+
+void render_quad_noxform(uint16_t texture_index, float *w);
+void render_tri_noxform(uint16_t texture_index, float *w);
+
+void render_quad_noxform_noclip(uint16_t texture_index, float *w);
+void render_tri_noxform_noclip(uint16_t texture_index, float *w);
 
 vec3_t render_transform(vec3_t pos);
 void render_push_sprite(vec3_t pos, vec2i_t size, uint32_t color, uint16_t texture);
