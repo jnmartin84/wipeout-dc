@@ -26,7 +26,6 @@ void title_update(void) {
 	render_push_2d(vec2i(0, 0), render_size(), rgba(128, 128, 128, 255), title_image);
 	ui_draw_text_centered("PRESS START", ui_scaled_pos(UI_POS_BOTTOM | UI_POS_CENTER, vec2i(0, -40)), UI_SIZE_8, UI_COLOR_DEFAULT);
 
-
 	if (input_pressed(A_MENU_SELECT) || input_pressed(A_MENU_START)) {
 		sfx_play(SFX_MENU_SELECT);
 		game_set_scene(GAME_SCENE_MAIN_MENU);

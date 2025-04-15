@@ -32,7 +32,7 @@ typedef enum {
 
 extern uint16_t RENDER_NO_TEXTURE;
 
-void render_init(void);
+void render_init()/* vec2i_t screen_size) */;
 void render_cleanup(void);
 vec2i_t render_res_to_size(render_resolution_t res);
 void render_reset_proj(float farval);
@@ -63,10 +63,12 @@ void render_tri(uint16_t texture);
 void render_quad_noxform(uint16_t texture_index, float *w);
 void render_tri_noxform(uint16_t texture_index, float *w);
 
+#if 1
 void render_quad_noxform_noclip(uint16_t texture_index, float *w);
 void render_tri_noxform_noclip(uint16_t texture_index, float *w);
+//void render_quad_noclip(uint16_t texture);
+#endif
 
-vec3_t render_transform(vec3_t pos);
 void render_push_sprite(vec3_t pos, vec2i_t size, uint32_t color, uint16_t texture);
 void render_push_2d(vec2i_t pos, vec2i_t size, rgba_t color, uint16_t texture);
 void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_t size, rgba_t color, uint16_t texture_index);

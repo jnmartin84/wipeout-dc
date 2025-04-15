@@ -9,14 +9,6 @@
 #include "kos.h"
 
 KOS_INIT_FLAGS(INIT_DEFAULT);
-pvr_init_params_t pvr_params = { { PVR_BINSIZE_16, 0, PVR_BINSIZE_16, 0, 0 },
-                                1048576,
-                            	0, // 0 is dma disabled
-                            	RENDER_USE_FSAA, // fsaa
-                                1, // 1 is autosort disabled
-                                2, // extra OPBs
-                                0, // Vertex buffer double-buffering enabled
- };
 
 uint8_t allow_exit;
 
@@ -27,10 +19,9 @@ static float tick_last;
 static float cycle_time = 0;
 
 void system_init(void) {
-	pvr_init(&pvr_params);
 	time_real = platform_now();
-	input_init();
 
+	input_init();
 	render_init();
 	game_init();
 }
@@ -66,7 +57,6 @@ void system_update(void) {
 	render_frame_end();
 
 	input_clear();
-	//mem_temp_check();
 }
 
 void system_reset_cycle_time(void) {
@@ -74,7 +64,7 @@ void system_reset_cycle_time(void) {
 }
 
 void system_resize(vec2i_t size) {
-	;
+	; //
 }
 
 float system_time_scale_get(void) {

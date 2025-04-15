@@ -65,7 +65,6 @@ void camera_update_race_internal(camera_t *camera, ship_t *ship, droid_t *droid)
 	camera->angle = vec3(ship->angle.x, ship->angle.y, ship->angle.z * save.internal_roll);
 }
 
-
 void camera_update_race_intro(camera_t *camera, ship_t *ship, droid_t *droid) {
 	// Set to final position
 	vec3_t pos = vec3_sub(ship->position, vec3_mulf(ship->dir_forward, 0.25 * 4096));
@@ -127,7 +126,6 @@ void camera_update_rescue(camera_t *camera, ship_t *ship, droid_t *droid) {
 	camera->angle.x = -bump_atan2f(target.y, height);
 	camera->angle.y = -bump_atan2f(target.x, target.z);
 }
-
 
 void camera_update_attract_internal(camera_t *camera, ship_t *ship, droid_t *droid) {
 	camera->update_timer -= system_tick();

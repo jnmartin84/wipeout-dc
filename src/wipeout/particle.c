@@ -36,7 +36,7 @@ void particles_update(void) {
 		}
 	}
 }
-//extern int cull_en;
+
 void particles_draw(void) {
 	if (particles_active == 0) {
 		return;

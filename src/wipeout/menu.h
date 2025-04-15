@@ -4,7 +4,7 @@
 #include "../types.h"
 #include "ui.h"
 
-#define MENU_PAGES_MAX 8
+#define MENU_PAGES_MAX 16
 #define MENU_ENTRIES_MAX 16
 
 typedef enum {

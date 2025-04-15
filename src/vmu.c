@@ -2,7 +2,6 @@
 #include <dc/vmu_fb.h>
 #include <dc/vmu_pkg.h>
 
-#if 1
 #include "vmudata.h"
 
 int32_t ControllerPakStatus = 1;
@@ -89,4 +88,3 @@ void draw_vmu_icon(void) {
 	if ((vmudev = maple_enum_type(0, MAPLE_FUNC_LCD)))
 		vmu_draw_lcd(vmudev, owl2_bits);
 }
-#endif

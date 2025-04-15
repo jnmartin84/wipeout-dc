@@ -1,24 +1,24 @@
 /**
  * WARNING
- *
+ * 
  * You will see many things in here that look "bad" such as:
  * - things being recomputed or re-set that can be computed/set exactly once and behave identically
  * - loops AND manually unrolled sections working on the same arrays for different purposes
- *
+ * 
  * You will be tempted to change them for consistency or "efficiency."
- *
+ * 
  * When you do, you are going to lose 20% of the rendering throughput.
- *
+ * 
  * Something, or many things, are sensitive to the code generation and memory layout after
  * compiling `-O3` with LTO enabled. Cache thrashing over the most MINOR of changes such as:
- *
+ * 
  * `int notex = (texture_index == RENDER_NO_TEXTURE);` -- FAST
  * `int notex = !texture_index;` -- 5 to 10 FPS slower
- *
+ * 
  * using a constant 255 instead of the calculated a0/1/2/3/4 in the vertex alpha fading code -- 5+ fps drop
  *
  * I have thought of these things, I have tried them. Things here are left as they are for a reason.
- *
+ * 
  * The current state of the repo is the version of the code producing the maximum output so far.
  */
 
@@ -33,12 +33,19 @@
 
 #include "alloc.h"
 
-extern int in_ship_draw;
+pvr_init_params_t pvr_params = {
+	{ PVR_BINSIZE_16, 0, PVR_BINSIZE_16, 0, 0 },
+	1048576,
+	0, // 0 is dma disabled
+	RENDER_USE_FSAA, // fsaa
+	1, // 1 is autosort disabled
+	2, // extra OPBs
+	0, // Vertex buffer double-buffering enabled
+};
 
 void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
-void mat4_mul_fipr(mat4_t *res, mat4_t *a, mat4_t *b);
-
-extern float RENDERDIST;
+static float shakex = 320.0f;
+static float shakey = 240.0f;
 
 #define NEAR_PLANE 16.0f
 #define FAR_PLANE (RENDER_FADEOUT_FAR)
@@ -56,12 +63,12 @@ typedef struct {
 	vec2i_t size;
 } render_texture_t;
 
-extern int no_fade;
 extern int load_OP;
 extern int drawing_text;
+extern int in_race;
+extern int in_menu;
 
 uint8_t cur_mode;
-int modes_dirty = 0;
 float screen_2d_z = -1.0f;
 
 pvr_dr_state_t dr_state;
@@ -78,12 +85,9 @@ static render_blend_mode_t blend_mode = RENDER_BLEND_NORMAL;
 
 static mat4_t __attribute__((aligned(32))) projection_mat = mat4_identity();
 static mat4_t __attribute__((aligned(32))) sprite_mat = mat4_identity();
-
 mat4_t __attribute__((aligned(32))) view_mat = mat4_identity();
 mat4_t __attribute__((aligned(32))) mvp_mat = mat4_identity();
 mat4_t __attribute__((aligned(32))) vp_mat;
-
-static mat4_t __attribute__((aligned(32))) ident;
 
 static render_texture_t __attribute__((aligned(32))) textures[TEXTURES_MAX];
 static uint32_t textures_len = 0;
@@ -93,7 +97,6 @@ int cull_en = 0;
 int test_en = 0;
 static uint8_t OGNOFILT[TEXTURES_MAX] = {0};
 static pvr_poly_hdr_t __attribute__((aligned(32))) *chdr[TEXTURES_MAX] = {0};
-pvr_poly_hdr_t chdr_opnotex;
 pvr_poly_hdr_t chdr_notex;
 pvr_poly_hdr_t hud_hdr;
 
@@ -111,7 +114,7 @@ static inline uint32_t np2(uint32_t v)
 	return v;
 }
 
-static void update_header(uint16_t texture_index/* , uint32_t notflat */) {
+static void update_header(uint16_t texture_index) {
 		uint32_t header1;
 		uint32_t header2;
 		uint32_t *hp = (uint32_t *)chdr[texture_index];
@@ -169,34 +172,26 @@ void compile_header(uint16_t texture_index) {
 	if ((texture_index != 0)) {
 		chdr[texture_index] = memalign(32, sizeof(pvr_poly_hdr_t));
 
-		if (!load_OP)
-			pvr_poly_cxt_txr(&ccxt, PVR_LIST_TR_POLY, PVR_TXRFMT_ARGB1555/*  | PVR_TXRFMT_NONTWIDDLED */, t->offset.x, t->offset.y, ptrs[texture_index], filtering);
-		else
-			pvr_poly_cxt_txr(&ccxt, PVR_LIST_OP_POLY, PVR_TXRFMT_ARGB1555 /* | PVR_TXRFMT_NONTWIDDLED */, t->offset.x, t->offset.y, ptrs[texture_index], filtering);
-
+		if (!load_OP) {
+			pvr_poly_cxt_txr(&ccxt, PVR_LIST_TR_POLY, PVR_TXRFMT_ARGB1555 | PVR_TXRFMT_TWIDDLED, t->offset.x, t->offset.y, ptrs[texture_index], filtering);
+		} else {
+			pvr_poly_cxt_txr(&ccxt, PVR_LIST_OP_POLY, PVR_TXRFMT_ARGB1555 | PVR_TXRFMT_TWIDDLED, t->offset.x, t->offset.y, ptrs[texture_index], filtering);
+		}
 
 		ccxt.depth.write = PVR_DEPTHWRITE_DISABLE;
-		if (!save.shading)
-			ccxt.gen.shading = PVR_SHADE_FLAT;
 		ccxt.depth.comparison = PVR_DEPTHCMP_NEVER;
 		pvr_poly_compile(chdr[texture_index], &ccxt);
 	} else {
 		pvr_poly_cxt_col(&ccxt, PVR_LIST_TR_POLY);
-		if (!save.shading)
-			ccxt.gen.shading = PVR_SHADE_FLAT;
 		pvr_poly_compile(&chdr_notex, &ccxt);
-		pvr_poly_cxt_col(&ccxt, PVR_LIST_OP_POLY);
-		ccxt.gen.shading = PVR_SHADE_FLAT;
-		pvr_poly_compile(&chdr_opnotex, &ccxt);
 	}
 }
 
 void render_init(void) {
 	pvr_poly_cxt_t ccxt;
+	pvr_init(&pvr_params);
 
-	memset(&ident.m[0], 0, 64);
-	ident.cols[0][0] = ident.cols[1][1] = ident.cols[2][2] = ident.cols[3][3] = 1.0f;
-
+	// 3mb VRAM block for glDC allocator
 	pvr_ptr_t block = pvr_mem_malloc((1048576*3)+2048);
 	if (-1 == alloc_init((void*)block, (1048576*3)))
 		exit(-1);
@@ -227,9 +222,8 @@ void render_init(void) {
 }
 
 void render_cleanup(void) {
-	;
+	; //
 }
-
 
 void render_reset_proj(float farval) {
 	float nf = -approx_recip(NEAR_PLANE - farval);
@@ -249,6 +243,7 @@ void render_set_screen_size(vec2i_t size) {
 	float fov = (73.75 / 180.0) * 3.14159265358;
 	float f = 1.0 / tan(fov / 2);
 	float nf = 1.0 / (NEAR_PLANE - 96000.0f);
+
 	projection_mat = mat4(
 		f / aspect, 0, 0, 0,
 		0, f, 0, 0,
@@ -258,43 +253,27 @@ void render_set_screen_size(vec2i_t size) {
 	memcpy32(&vp_mat.m[0], &projection_mat.m[0], 16*4);
 }
 
-// todo - make it not stupid
 vec2i_t render_res_to_size(render_resolution_t res) {
-	vec2i_t ssize[3];
+	vec2i_t ssize[2];
 	ssize[0].x = 640;
 	ssize[0].y = 480;
-
+	
 	ssize[1].x = 640;
 	ssize[1].y = 360;
-
-	ssize[2].x = 640;
-	ssize[2].y = 360;
 
 	return ssize[(int)res];
 }
 
-float halfheight = 240.0f;
-int letterbox = 0;
-
 void render_set_resolution(render_resolution_t res) {
-	letterbox = (res == RENDER_RES_169L);
 	render_set_screen_size(render_res_to_size(res));
-	if (letterbox)
-		halfheight = 180.f;
-	else
-		halfheight = 240.0f;
 }
 
 void render_set_post_effect(render_post_effect_t post) {
-	;
 }
 
 vec2i_t render_size(void) {
 	return screen_size;
 }
-
-extern int in_race;
-extern int in_menu;
 
 void render_frame_prepare(void) {
 	render_set_depth_write(true);
@@ -308,69 +287,13 @@ void render_frame_prepare(void) {
 		pvr_list_begin(PVR_LIST_TR_POLY);
 
 	pvr_dr_init(&dr_state);
+
 	pvr_set_zclip(0.000005f);
 }
 
 void render_frame_end(void) {
-#if 0
-	if (letterbox) {
-		pvr_prim(&chdr_notex, 32);
-
-		vs[0].x = 0;
-		vs[0].y = 60;
-		vs[0].z = 20;
-		vs[0].argb = 0xff000000;
-		vs[0].oargb = 0;
-
-		vs[1].x = 0;
-		vs[1].y = 0;
-		vs[1].z = 20;
-		vs[1].argb = 0xff000000;
-		vs[1].oargb = 0;
-
-		vs[2].x = 640;
-		vs[2].y = 60;
-		vs[2].argb = 0xff000000;
-		vs[2].z = 20;
-		vs[2].oargb = 0;
-
-		vs[3].x = 640;
-		vs[3].y = 0;
-		vs[3].z = 20;
-		vs[3].argb = 0xff000000;
-		vs[3].oargb = 0;
-
-		pvr_prim(vs, 128);
-
-		vs[0].x = 0;
-		vs[0].y = 480;
-		vs[0].z = 20;
-		vs[0].argb = 0xff000000;
-		vs[0].oargb = 0;
-
-		vs[1].x = 0;
-		vs[1].y = 420;
-		vs[1].z = 20;
-		vs[1].argb = 0xff000000;
-		vs[1].oargb = 0;
-
-		vs[2].x = 640;
-		vs[2].y = 480;
-		vs[2].argb = 0xff000000;
-		vs[2].z = 20;
-		vs[2].oargb = 0;
-
-		vs[3].x = 640;
-		vs[3].y = 420;
-		vs[3].z = 20;
-		vs[3].argb = 0xff000000;
-		vs[3].oargb = 0;
-
-		pvr_prim(vs, 128);
-	}
-#endif
-	pvr_list_finish();
-	pvr_scene_finish();
+    pvr_list_finish();
+    pvr_scene_finish();
 
 	screen_2d_z = -1.0f;
 }
@@ -390,6 +313,7 @@ void render_set_view(vec3_t pos, vec3_t angles) {
 void render_set_view_2d(void) {
 	render_set_depth_test(false);
 	render_set_depth_write(false);
+
 	float near = -1;
 	float far = 1;
 	float left = 0;
@@ -399,6 +323,7 @@ void render_set_view_2d(void) {
 	float lr = 1 / (left - right);
 	float bt = 1 / (bottom - top);
 	float nf = 1 / (near - far);
+
 	mvp_mat = mat4(
 		-2 * lr, 0, 0, 0,
 		0, -2 * bt, 0, 0,
@@ -432,11 +357,11 @@ void render_set_depth_test(bool enabled) {
 }
 
 void render_set_depth_offset(float offset) {
-	;
+	; //
 }
 
 void render_set_screen_position(vec2_t pos) {
-	;
+	; //
 }
 
 void render_set_blend_mode(render_blend_mode_t new_mode) {
@@ -453,21 +378,15 @@ void render_set_cull_backface(bool enabled) {
 	}
 }
 
-static uint16_t last_index = 1025;
-
-vec3_t render_transform(vec3_t pos) {
-	//return vec3_transform(vec3_transform(pos, &view_mat), &projection_mat);
-	return vec3_transform(pos, &mvp_mat);
-}
+static uint16_t last_index = 256;
 
 static float wout;
 
 #define cliplerp(__a, __b, __t) ((__a) + (((__b) - (__a))*(__t)))
 
 static uint32_t color_lerp(float ft, uint32_t c1, uint32_t c2) {
-	if (ft < 0.5f)
-		return c1;
-	return c2;
+	if (ft < 0.5f) return c1;
+	return c2;	
 }
 
 static void nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, float w0, float w1) {
@@ -486,8 +405,25 @@ static void nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, f
 	wout = cliplerp(w0, w1, t);
 }
 
-static inline void perspdiv(pvr_vertex_t *v, float w)
-{
+static float shakeCount = 0;
+void SetShake(float duration) {
+	shakeCount = (duration / 30.0f);
+}
+
+void ShakeScreen(void) {
+	if(shakeCount > 0.0f) {
+		shakex = 320.0f + ((-(rand_float(0.0f, shakeCount)) + (shakeCount * 0.5f))*45.0f);
+		shakey = 240.0f + ((-(rand_float(0.0f, shakeCount)) + (shakeCount * 0.5f))*45.0f);
+		shakeCount -= system_tick();
+	}
+	else {
+		shakex = 320.0f; 
+		shakey = 240.0f;
+		shakeCount = 0.0f;
+	}
+}       
+
+static inline void perspdiv(pvr_vertex_t *v, float w) {
 	const float invw = approx_recip(w);
 	float x = v->x * invw;
 	float y = v->y * invw;
@@ -495,9 +431,10 @@ static inline void perspdiv(pvr_vertex_t *v, float w)
 #if RENDER_USE_FSAA
 	x = 640.0f + (640.0f * x);
 #else
-	x = 320.0f + (320.0f * x);
+	x = shakex + (320.0f * x);
 #endif
-	y = 240.0f - (halfheight * y);
+	// 4:3 or 16:9 anamorphic
+	y = shakey - (240.0f * y);
 
 	v->x = x;
 	v->y = y;
@@ -530,48 +467,44 @@ void render_hud_quad(uint16_t texture_index) {
 
 void render_quad(uint16_t texture_index) {
 	float w0,w1,w2,w3,w4;
-
+	uint8_t cl0, cl1, cl2, cl3;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
-	mat_trans_single3_nodivw(vs[0].x,vs[0].y,vs[0].z,w0);
-	mat_trans_single3_nodivw(vs[1].x,vs[1].y,vs[1].z,w1);
-	mat_trans_single3_nodivw(vs[2].x,vs[2].y,vs[2].z,w2);
-	mat_trans_single3_nodivw(vs[3].x,vs[3].y,vs[3].z,w3);
+	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
+	mat_trans_single3_nodivw(vs[1].x, vs[1].y, vs[1].z, w1);
+	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
+	mat_trans_single3_nodivw(vs[3].x, vs[3].y, vs[3].z, w3);
 
-	uint8_t cl0, cl1, cl2, cl3;
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].z < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
 
-	// todo - do all the -w tests first, bail early, do the rest
-	cl0 = !(vs[0].z > w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].z < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
-	cl1 = !(vs[1].z > w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].z < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
 
-	cl2 = !(vs[2].z > w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+    cl3 = !(vs[3].z >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].z < -w3);
+    cl3 = (cl3 << 1) | !(vs[3].y >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].y < -w3);
+    cl3 = (cl3 << 1) | !(vs[3].x >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].x < -w3);
 
-	cl3 = !(vs[3].z >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].z < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].y >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].y < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].x >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].x < -w3);
-
-	if ((cl0 | cl1 | cl2 | cl3) != 0x3f) {
+    if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
 		return;
-	}
 
 	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2) | ((!(vs[3].z < -w3)) << 3));
 	vs[2].flags = PVR_CMD_VERTEX;
@@ -580,165 +513,163 @@ void render_quad(uint16_t texture_index) {
 	if (vismask == 15) {
 		goto quad_sendit;
 	} else {
-		// if you want to literally see which quads get near-z clipped
-		//return;
 		switch (vismask)
 		{
-	// quad only 0 visible
-	case 1:
-		sendverts = 3;
+		// quad only 0 visible
+		case 1:
+			sendverts = 3;
 
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
 
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad only 1 visible
-	case 2:
-		sendverts = 3;
+		// quad only 1 visible
+		case 2:
+			sendverts = 3;
 
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
-		w2 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
+			w2 = wout;
 
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad 0 + 1 visible
-	case 3:
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
+		// quad 0 + 1 visible
+		case 3:
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
 
-		break;
+			break;
 
-	// quad only 2 visible
-	case 4:
-		sendverts = 3;
+		// quad only 2 visible
+		case 4:
+			sendverts = 3;
 
-		nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[1], w2, w3);
-		w1 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[1], w2, w3);
+			w1 = wout;
 
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad 0 + 2 visible
-	case 5:
-		nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-		w1 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
-		w3 = wout;
+		// quad 0 + 2 visible
+		case 5:
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
+			w3 = wout;
 
-		break;
+			break;
 
-	// quad 0 + 1 + 2 visible
-	case 7:
-		sendverts = 5;
+		// quad 0 + 1 + 2 visible
+		case 7:
+			sendverts = 5;
 
-		nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
-		w4 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
+			w4 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
 
-		vs[3].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad only 3 visible
-	case 8:
-		sendverts = 3;
+		// quad only 3 visible
+		case 8:
+			sendverts = 3;
 
-		nearz_clip(&vs[1], &vs[3], &vs[0], w1, w3);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
-		w2 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[0], w1, w3);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
+			w2 = wout;
 
-		memcpy32(&vs[1], &vs[3], 32);
-		w1 = w3;
+			memcpy32(&vs[1], &vs[3], 32);
+			w1 = w3;
 
-		vs[1].flags = PVR_CMD_VERTEX;
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
+			vs[1].flags = PVR_CMD_VERTEX;
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad 1 + 3 visible
-	case 10:
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
-		w2 = wout;
+		// quad 1 + 3 visible
+		case 10:
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
+			w2 = wout;
 
-		break;
+			break;
 
-	// quad 0 + 1 + 3 visible
-	case 11:
-		sendverts = 5;
+		// quad 0 + 1 + 3 visible
+		case 11:
+			sendverts = 5;
 
-		nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
-		w4 = wout;
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
+			w4 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
 
-		vs[3].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad 2 + 3 visible
-	case 12:
-		nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
-		w0 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
-		w1 = wout;
+		// quad 2 + 3 visible
+		case 12:
+			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
+			w0 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
+			w1 = wout;
 
-		break;
+			break;
 
-	// quad 0 + 2 + 3 visible
-	case 13:
-		sendverts = 5;
+		// quad 0 + 2 + 3 visible
+		case 13:
+			sendverts = 5;
 
-		memcpy32(&vs[4], &vs[3], 32);
-		w4 = w3;
+			memcpy32(&vs[4], &vs[3], 32);
+			w4 = w3;
 
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
-		nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-		w1 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
 
-		vs[3].flags = PVR_CMD_VERTEX;
-		vs[4].flags = PVR_CMD_VERTEX_EOL;
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
 
-		break;
+			break;
 
-	// quad 1 + 2 + 3 visible
-	case 14:
-		sendverts = 5;
+		// quad 1 + 2 + 3 visible
+		case 14:
+			sendverts = 5;
 
-		memcpy32(&vs[4], &vs[2], 32);
-		w4 = w2;
+			memcpy32(&vs[4], &vs[2], 32);
+			w4 = w2;
 
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
 
-		vs[3].flags = PVR_CMD_VERTEX;
-		vs[4].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			break;
 		}
 	}
-quad_sendit:
-	uint8_t a0 = ((vs[0].argb >> 24) & 0x000000ff);
 
+quad_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
@@ -747,56 +678,445 @@ quad_sendit:
 	if (sendverts == 5)
 		perspdiv(&vs[4], w4);
 
-	// this is a fix for the shields being drawn in a way that messes with depth writing
-	// and was making flames disappear
-	int prev_dep = dep_en;
-	if (a0 == 48) {
-		render_set_depth_write(false);
-		vs[0].z += 0.00005f;
-		vs[1].z += 0.00005f;
-		vs[2].z += 0.00005f;
-		if (sendverts > 3)
-			vs[3].z += 0.00005f;
-		if (sendverts == 5)
-			vs[4].z += 0.00005f;
-	}
-
+	// anything but boost/item pads
 	if (vs[0].oargb < 3) {
-		cur_mode |= vs[0].oargb;
-
-		if (last_index != texture_index) {
+		// both of these need to be checked at top level, not one with one nested
+		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
 			last_index = texture_index;
 
-			if (cur_mode != last_mode[texture_index]) {
-				last_mode[texture_index] = cur_mode;
+			last_mode[texture_index] = cur_mode;
 
-				if (texture_index < TEXTURES_MAX) {
-					update_header(texture_index);
-				}
-			}
-
-			if(__builtin_expect(notex,0)) {
+			update_header(texture_index);
+	
+			if(__builtin_expect(notex,0))
 				pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-			} else {
+			else
 				pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-			}
+		}
+
+		pvr_prim(vs, sendverts * 32);
+	} else {
+		// boost/item pads use blending to be bright enough/glow
+		render_blend_mode_t prev_blend = blend_mode;
+		int prev_cull = cull_en;
+		last_index = texture_index;
+
+		render_set_cull_backface(true);
+
+		// base quad
+		render_set_blend_mode(RENDER_BLEND_STUPID);
+
+		last_mode[texture_index] = cur_mode;
+		update_header(texture_index);
+
+		if(__builtin_expect(notex,0))
+			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+		else
+			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+
+		pvr_prim(vs, sendverts * 32);
+
+		// blended quad
+		render_set_blend_mode(RENDER_BLEND_SPECIAL);
+
+		last_mode[texture_index] = cur_mode;
+		update_header(texture_index);
+
+		if(__builtin_expect(notex,0))
+			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+		else
+			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+
+		// slight offset up and toward near plane
+		for (int i=0;i<sendverts;i++) {
+			vs[i].y += 0.00005f;
+			vs[i].z += 0.00005f;
 		}
 
 		pvr_prim(vs, sendverts * 32);
 
-		// shield cleanup
-		if (a0 == 48)
-			render_set_depth_write(prev_dep);
+		// restore blend mode that was set before any of this
+		render_set_blend_mode(prev_blend);
+
+		render_set_cull_backface(prev_cull);
+	}
+}
+
+extern int shields_active;
+
+void render_tri(uint16_t texture_index) {
+	float w0,w1,w2,w3;
+	uint8_t cl0, cl1, cl2;
+	int notex = (texture_index == RENDER_NO_TEXTURE);
+
+	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
+	mat_trans_single3_nodivw(vs[1].x, vs[1].y, vs[1].z, w1);
+	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
+
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].z < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].z < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].z < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+	if ((cl0 | cl1 | cl2) != 0x3f)
+		return;
+
+	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2));
+	int usespare = 0;
+	vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+	if (vismask == 7) {
+		goto tri_sendit;
+	} else {
+		switch (vismask)
+		{
+		case 1:
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+
+			break;
+		case 2:
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
+			w2 = wout;
+
+			break;
+		case 3:
+			usespare = 1;
+
+			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
+			w3 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+		case 4:
+			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
+			w0 = wout;
+			nearz_clip(&vs[1], &vs[2], &vs[1], w1, w2);
+			w1 = wout;
+
+			break;
+		case 5:
+			usespare = 1;
+
+			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
+			w3 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+		case 6:
+			usespare = 1;
+
+			memcpy32(&vs[3], &vs[2], 32);
+			w3 = w2;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+		}
+	}
+
+tri_sendit:
+	perspdiv(&vs[0], w0);
+	perspdiv(&vs[1], w1);
+	perspdiv(&vs[2], w2);
+	if (usespare)
+		perspdiv(&vs[3], w3);
+
+	// don't do anything header-related if we're on the same texture or render mode as the last call
+	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		last_index = texture_index;
+
+		last_mode[texture_index] = cur_mode;
+
+		update_header(texture_index);
+	
+		if(__builtin_expect(notex,0))
+			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+		else
+			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+	}
+
+	pvr_prim(vs, 3 * 32);
+	if (usespare)
+		pvr_prim(&vs[3], 32);
+}
+
+void render_quad_noxform(uint16_t texture_index, float *w) {
+	float w0,w1,w2,w3,w4;
+  	uint8_t cl0, cl1, cl2, cl3;
+	int notex = (texture_index == RENDER_NO_TEXTURE);
+
+	w0 = w[0];
+	w1 = w[1];
+	w2 = w[2];
+	w3 = w[3];
+
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].z < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].z < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].z < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+    cl3 = !(vs[3].z >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].z < -w3);
+    cl3 = (cl3 << 1) | !(vs[3].y >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].y < -w3);
+    cl3 = (cl3 << 1) | !(vs[3].x >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].x < -w3);
+
+    if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
+		return;
+
+	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2) | ((!(vs[3].z < -w3)) << 3));
+
+	vs[2].flags = PVR_CMD_VERTEX;
+	vs[3].flags = PVR_CMD_VERTEX_EOL;
+
+	int sendverts = 4;
+
+	if (vismask == 15) {
+		goto quad_sendit;
+	} else {
+		switch (vismask)
+		{
+		// quad only 0 visible
+		case 1:
+			sendverts = 3;
+
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad only 1 visible
+		case 2:
+			sendverts = 3;
+
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
+			w2 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad 0 + 1 visible
+		case 3:
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
+
+			break;
+
+		// quad only 2 visible
+		case 4:
+			sendverts = 3;
+
+			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[1], w2, w3);
+			w1 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad 0 + 2 visible
+		case 5:
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
+			w3 = wout;
+
+			break;
+
+		// quad 0 + 1 + 2 visible
+		case 7:
+			sendverts = 5;
+
+			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
+			w4 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
+
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad only 3 visible
+		case 8:
+			sendverts = 3;
+
+			nearz_clip(&vs[1], &vs[3], &vs[0], w1, w3);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
+			w2 = wout;
+
+			memcpy32(&vs[1], &vs[3], 32);
+			w1 = w3;
+
+			vs[1].flags = PVR_CMD_VERTEX;
+			vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad 1 + 3 visible
+		case 10:
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
+			w2 = wout;
+
+			break;
+
+		// quad 0 + 1 + 3 visible
+		case 11:
+			sendverts = 5;
+
+			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
+			w4 = wout;
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad 2 + 3 visible
+		case 12:
+			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
+			w0 = wout;
+			nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
+			w1 = wout;
+
+			break;
+
+		// quad 0 + 2 + 3 visible
+		case 13:
+			sendverts = 5;
+
+			memcpy32(&vs[4], &vs[3], 32);
+			w4 = w3;
+
+			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
+			w3 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
+
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+
+		// quad 1 + 2 + 3 visible
+		case 14:
+			sendverts = 5;
+
+			memcpy32(&vs[4], &vs[2], 32);
+			w4 = w2;
+
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			w2 = wout;
+			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
+
+			vs[3].flags = PVR_CMD_VERTEX;
+			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
+			break;
+		}
+	}
+
+quad_sendit:
+	perspdiv(&vs[0], w0);
+	perspdiv(&vs[1], w1);
+	perspdiv(&vs[2], w2);
+	if (sendverts > 3)
+		perspdiv(&vs[3], w3);
+	if (sendverts == 5)
+		perspdiv(&vs[4], w4);
+
+	if (vs[0].oargb < 3) {
+
+		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+			last_index = texture_index;
+
+			last_mode[texture_index] = cur_mode;
+
+			update_header(texture_index);
+	
+			if(__builtin_expect(notex,0))
+				pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+			else
+				pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+		}
+
+		pvr_prim(vs, sendverts * 32);
 	} else {
 		int prev_cull = cull_en;
 		render_blend_mode_t prev_blend = blend_mode;
+		last_index = texture_index;
 
-		render_set_blend_mode(RENDER_BLEND_STUPID);
 		render_set_cull_backface(true);
 
-		last_index = texture_index;
-		last_mode[texture_index] = cur_mode;
+		render_set_blend_mode(RENDER_BLEND_STUPID);
 
+		last_mode[texture_index] = cur_mode;
 		update_header(texture_index);
 
 		if(__builtin_expect(notex,0))
@@ -807,6 +1127,7 @@ quad_sendit:
 		pvr_prim(vs, sendverts * 32);
 
 		render_set_blend_mode(RENDER_BLEND_SPECIAL);
+
 		last_mode[texture_index] = cur_mode;
 		update_header(texture_index);
 
@@ -823,47 +1144,45 @@ quad_sendit:
 		pvr_prim(vs, sendverts * 32);
 
 		render_set_blend_mode(prev_blend);
+
 		render_set_cull_backface(prev_cull);
 	}
 }
 
-extern int shields_active;
-
-void render_tri(uint16_t texture_index) {
-	int notex = (texture_index == RENDER_NO_TEXTURE);
+void render_tri_noxform(uint16_t texture_index, float *w) {
 	float w0,w1,w2,w3;
+	int notex = (texture_index == RENDER_NO_TEXTURE);
 
-	mat_trans_single3_nodivw(vs[0].x,vs[0].y,vs[0].z,w0);
-	mat_trans_single3_nodivw(vs[1].x,vs[1].y,vs[1].z,w1);
-	mat_trans_single3_nodivw(vs[2].x,vs[2].y,vs[2].z,w2);
+	w0 = w[0];
+	w1 = w[1];
+	w2 = w[2];
 
-	uint8_t cl0, cl1, cl2;
+  	uint8_t cl0, cl1, cl2;
 
-	cl0 = !(vs[0].z >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].z < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
 
-	cl1 = !(vs[1].z >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].z < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
-	cl2 = !(vs[2].z >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].z < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
 
-	if ((cl0 | cl1 | cl2) != 0x3f) {
+	if ((cl0 | cl1 | cl2) != 0x3f)
 		return;
-	}
-
+ 
 	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2));
 	int usespare = 0;
 	vs[2].flags = PVR_CMD_VERTEX_EOL;
@@ -878,104 +1197,155 @@ void render_tri(uint16_t texture_index) {
 			w1 = wout;
 			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
+
 			break;
 		case 2:
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
 			w0 = wout;
 			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
 			w2 = wout;
+
 			break;
 		case 3:
 			usespare = 1;
+
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
 			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			break;
 		case 4:
 			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
 			w0 = wout;
 			nearz_clip(&vs[1], &vs[2], &vs[1], w1, w2);
 			w1 = wout;
+
 			break;
 		case 5:
 			usespare = 1;
+
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
 			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
 			w1 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			break;
 		case 6:
 			usespare = 1;
+
 			memcpy32(&vs[3], &vs[2], 32);
 			w3 = w2;
 			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
 			w0 = wout;
+
+			vs[2].flags = PVR_CMD_VERTEX;
+			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			break;
 		}
 	}
+
 tri_sendit:
-	uint8_t a0 = ((vs[0].argb >> 24) & 0x000000ff);
+	perspdiv(&vs[0], w0);
+	perspdiv(&vs[1], w1);
+	perspdiv(&vs[2], w2);
+	if (usespare)
+		perspdiv(&vs[3], w3);
+
+	// don't do anything header-related if we're on the same texture or render mode as the last call
+	render_set_blend_mode(RENDER_BLEND_NORMAL);
+	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		last_index = texture_index;
+
+		last_mode[texture_index] = cur_mode;
+
+		update_header(texture_index);
+	
+		if(__builtin_expect(notex,0))
+			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+		else
+			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+	}
+
+	pvr_prim(vs, 3 * 32);
+	if (usespare)
+		pvr_prim(&vs[3], 32);
+}
+
+void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
+	float w0,w1,w2,w3;
+  	uint8_t cl0, cl1, cl2, cl3;
+
+	int notex = (texture_index == RENDER_NO_TEXTURE);
+
+	w0 = w[0];
+	w1 = w[1];
+	w2 = w[2];
+	w3 = w[3];
+
+    cl0 = !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+    cl1 = !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+
+    cl2 = !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+    cl3 = !(vs[3].y >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].y < -w3);
+    cl3 = (cl3 << 1) | !(vs[3].x >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].x < -w3);
+
+    if ((cl0 | cl1 | cl2 | cl3) != 0x0f)
+		return;
+ 
+	vs[2].flags = PVR_CMD_VERTEX;
+	vs[3].flags = PVR_CMD_VERTEX_EOL;
 
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
+	perspdiv(&vs[3], w3);
 
-	// this is a fix for the shields being drawn in a way that messes with depth writing
-	// and was making flames disappear
-	int prev_dep = dep_en;
-	if (a0 == 48) {
-		render_set_depth_write(false);
-		vs[0].z += 0.00005f;
-		vs[1].z += 0.00005f;
-		vs[2].z += 0.00005f;
-		if (usespare)
-			vs[3].z += 0.00005f;
-	}
-
-	// don't do anything header-related if we're on the same texture as the last call
-	if (vs[0].oargb < 2) {
-		cur_mode |= vs[0].oargb;
-		if (last_index != texture_index) {
+	if (vs[0].oargb < 3) {
+		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
 			last_index = texture_index;
 
-			if (cur_mode != last_mode[texture_index]) {
-				last_mode[texture_index] = cur_mode;
+			last_mode[texture_index] = cur_mode;
 
-				if (texture_index < TEXTURES_MAX)
-					update_header(texture_index);
-			}
-
+			update_header(texture_index);
+	
 			if(__builtin_expect(notex,0))
 				pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
 			else
 				pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
 		}
 
-		if (usespare) {
-			vs[2].flags = PVR_CMD_VERTEX;
-			perspdiv(&vs[3], w3);
-		}
-
-		pvr_prim(vs, 3 * 32);
-		if (usespare)
-			pvr_prim(&vs[3], 32);
-
-		// shield cleanup
-		if (a0 == 48)
-			render_set_depth_write(prev_dep);
+		pvr_prim(vs, 128);
 	} else {
-		if (!shields_active)
-			render_set_depth_write(false);
-
-		render_blend_mode_t prev_blend = blend_mode;
 		int prev_cull = cull_en;
+		render_blend_mode_t prev_blend = blend_mode;
+		last_index = texture_index;
+
 		render_set_cull_backface(true);
 
-		render_set_blend_mode(RENDER_BLEND_NORMAL);
-		last_index = texture_index;
+		render_set_blend_mode(RENDER_BLEND_STUPID);
 		last_mode[texture_index] = cur_mode;
 
 		update_header(texture_index);
@@ -985,11 +1355,9 @@ tri_sendit:
 		else
 			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
 
-		pvr_prim(vs, 3 * 32);
-		if (usespare)
-			pvr_prim(&vs[3], 32);
+		pvr_prim(vs, 128);
 
-		render_set_blend_mode(RENDER_BLEND_LIGHTER);
+		render_set_blend_mode(RENDER_BLEND_SPECIAL);
 
 		last_mode[texture_index] = cur_mode;
 		update_header(texture_index);
@@ -999,44 +1367,91 @@ tri_sendit:
 		else
 			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
 
-		vs[0].z += 0.000025f;
-		vs[1].z += 0.000025f;
-		vs[2].z += 0.000025f;
-		if (usespare)
-			vs[3].z += 0.000025f;
+		vs[0].y += 0.00005f;
+		vs[0].z += 0.00005f;
+		vs[1].y += 0.00005f;
+		vs[1].z += 0.00005f;
+		vs[2].y += 0.00005f;
+		vs[2].z += 0.00005f;
+		vs[3].y += 0.00005f;
+		vs[3].z += 0.00005f;
+		pvr_prim(vs, 128);
 
-		pvr_prim(vs, 3 * 32);
-		if (usespare)
-			pvr_prim(&vs[3], 32);
+		render_set_blend_mode(prev_blend);
 
 		render_set_cull_backface(prev_cull);
-		render_set_blend_mode(prev_blend);
-		if (!shields_active)
-			render_set_depth_write(prev_dep);
-		last_index = texture_index;
 	}
 }
 
 
-void render_push_sprite(vec3_t pos, vec2i_t size, uint32_t lcol/* or */, uint16_t texture_index) {
-	render_texture_t *t = &textures[texture_index];
-	float rpw = approx_recip(t->offset.x);
-	float rph = approx_recip(t->offset.y);
+void render_tri_noxform_noclip(uint16_t texture_index, float *w) {
+	float w0,w1,w2;
+ 	uint8_t cl0, cl1, cl2;
+	int notex = (texture_index == RENDER_NO_TEXTURE);
 
+	w0 = w[0];
+	w1 = w[1];
+	w2 = w[2];
+
+    cl0 = !(vs[0].y >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y < -w0);
+    cl0 = (cl0 << 1) | !(vs[0].x >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+    cl1 = !(vs[1].y >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y < -w1);
+    cl1 = (cl1 << 1) | !(vs[1].x >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+
+    cl2 = !(vs[2].y >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].y < -w2);
+    cl2 = (cl2 << 1) | !(vs[2].x >  w2);
+    cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+    if ((cl0 | cl1 | cl2) != 0x0f)
+		return;
+
+	vs[2].flags = PVR_CMD_VERTEX_EOL;
+
+	perspdiv(&vs[0], w0);
+	perspdiv(&vs[1], w1);
+	perspdiv(&vs[2], w2);
+
+	// don't do anything header-related if we're on the same texture or render mode as the last call
+	render_set_blend_mode(RENDER_BLEND_NORMAL);
+
+	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		last_index = texture_index;
+
+		last_mode[texture_index] = cur_mode;
+
+		update_header(texture_index);
+
+		if(__builtin_expect(notex,0))
+			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
+		else
+			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
+	}
+
+	pvr_prim(vs, 96);
+}
+
+void render_push_sprite(vec3_t pos, vec2i_t size, uint32_t lcol, uint16_t texture_index) {
 	screen_2d_z += 0.0005f;
-
 	// this ordering fixes the drawing of sprites without disabling culling
 	vec3_t p1 = vec3_add(pos, vec3_transform(vec3( size.x * 0.5f, -size.y * 0.5f, screen_2d_z), &sprite_mat));
 	vec3_t p2 = vec3_add(pos, vec3_transform(vec3(-size.x * 0.5f, -size.y * 0.5f, screen_2d_z), &sprite_mat));
 	vec3_t p3 = vec3_add(pos, vec3_transform(vec3( size.x * 0.5f,  size.y * 0.5f, screen_2d_z), &sprite_mat));
 	vec3_t p4 = vec3_add(pos, vec3_transform(vec3(-size.x * 0.5f,  size.y * 0.5f, screen_2d_z), &sprite_mat));
-
+	render_texture_t *t = &textures[texture_index];
+	float rpw = approx_recip(t->offset.x);
+	float rph = approx_recip(t->offset.y);
 //	vs[0].flags = PVR_CMD_VERTEX;
 	vs[0].x = p1.x;
 	vs[0].y = p1.y;
 	vs[0].z = p1.z;
-	vs[0].u = 1.0f * rpw;
-	vs[0].v = 1.0f * rph;
+	vs[0].u = rpw;
+	vs[0].v = rph;
 	vs[0].argb = lcol;
 	vs[0].oargb = 0;
 
@@ -1045,7 +1460,7 @@ void render_push_sprite(vec3_t pos, vec2i_t size, uint32_t lcol/* or */, uint16_
 	vs[1].y = p2.y;
 	vs[1].z = p2.z;
 	vs[1].u = (t->size.x - 1.0f) * rpw;
-	vs[1].v = 1.0f * rph;
+	vs[1].v = rph;
 	vs[1].argb = lcol;
 //	vs[1].oargb = 0;
 
@@ -1075,12 +1490,14 @@ void render_push_2d(vec2i_t pos, vec2i_t size, rgba_t color, uint16_t texture_in
 }
 
 void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_t size, rgba_t color, uint16_t texture_index) {
+//	error_if(texture_index >= textures_len, "Invalid texture %d", texture_index);
 	vec2i_t tsize = render_texture_padsize(texture_index);
 	float rpw = approx_recip((float)tsize.x);
 	float rph = approx_recip((float)tsize.y);
-	uint32_t lcol = (color.a << 24) | (color.r << 16) | (color.g << 8) | (color.b);
 
 	screen_2d_z += 0.0005f;
+
+	uint32_t lcol = (color.a << 24) | (color.r << 16) | (color.g << 8) | (color.b);
 
 //	vs[0].flags = PVR_CMD_VERTEX;
 	vs[0].x = pos.x;
@@ -1121,10 +1538,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	render_quad(texture_index);
 }
 
-uint16_t *tmpstore;
-
 #include "platform.h"
-
 uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 	uint16_t texture_index = textures_len++;
 
@@ -1132,39 +1546,38 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 		int wp2 = np2(tw);
 		int hp2 = np2(th);
 
-		// sonic adventure billboard :-D
 		if (g.race_class == RACE_CLASS_VENOM && g.circut == CIRCUT_TERRAMAX && texture_index == 0x88) {
 			uint32_t dcpad_size;
 			ptrs[texture_index] = alloc_malloc(NULL, wp2 * hp2 * 2);
 			// if we ran out of VRAM (we don't, but if we did), handle it by just using color poly header
-			//if (ptrs[texture_index == 0])
-			//	goto createbail;
+			if (ptrs[texture_index == 0])
+				goto createbail;
 
 			textures[texture_index] = (render_texture_t){ {wp2, hp2}, {tw, th} };
+
 			void *objdata = platform_load_asset("wipeout/common/sonic.raw", &dcpad_size);
 			pvr_txr_load(objdata, ptrs[texture_index], 128*64*2);
 			mem_temp_free(objdata);
 		} else {
-			tmpstore = (uint16_t *)mem_temp_alloc(sizeof(uint16_t)*wp2*hp2);
+			uint16_t *tmpstore = (uint16_t *)mem_temp_alloc(sizeof(uint16_t)*wp2*hp2);
 
 			// there's something weird with textures of the bottom of the right wing of every ship
 			// and the ring through the top of the stopwatch in the options menu
 			// i dont really know what is going on there, but this is a color that doesnt look ridiculous
 			// for any of those contexts
-			for(int i=0;i<wp2*hp2;i++) tmpstore[i] = 0xBDEF;
+			for (int i = 0; i < wp2 * hp2; i++)
+				tmpstore[i] = 0xBDEF;
 
-			ptrs[texture_index] = alloc_malloc(NULL, wp2*hp2*2);//pvr_mem_malloc(wp2 * hp2 * 2);
+			ptrs[texture_index] = alloc_malloc(NULL, wp2 * hp2 * 2);
 			// if we ran out of VRAM (we don't, but if we did), handle it by just using color poly header
-			//if (ptrs[texture_index == 0])
-			//	goto createbail;
+			if (ptrs[texture_index == 0])
+				goto createbail;
 
 			textures[texture_index] = (render_texture_t){ {wp2, hp2}, {tw, th} };
 
-			for (uint32_t y=0;y<th;y++) {
-				for(uint32_t x=0;x<tw;x++) {
+			for (uint32_t y = 0; y < th; y++)
+				for(uint32_t x = 0;x < tw; x++)
 					tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
-				}
-			}
 
 			pvr_txr_load_ex(tmpstore, ptrs[texture_index], wp2, hp2, PVR_TXRLOAD_16BPP);
 			mem_temp_free(tmpstore);
@@ -1174,9 +1587,8 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 	compile_header(texture_index);
 
 createbail:
-	if (ptrs[texture_index] == 0) {
+	if (ptrs[texture_index] == 0)
 		chdr[texture_index] = &chdr_notex;
-	}
 
 	return texture_index;
 }
@@ -1232,650 +1644,5 @@ void render_textures_reset(uint16_t len) {
 }
 
 void render_textures_dump(const char *path) {
-	;
-}
-
-
-
-
-void render_quad_noxform(uint16_t texture_index, float *w) {
-	float w0,w1,w2,w3,w4;
-
-	int notex = (texture_index == RENDER_NO_TEXTURE);
-
-	w0 = w[0];
-	w1 = w[1];
-	w2 = w[2];
-	w3 = w[3];
-
-  	uint8_t cl0, cl1, cl2, cl3;
-
-	cl0 = !(vs[0].z >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
-
-	cl1 = !(vs[1].z >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
-
-	cl2 = !(vs[2].z >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
-
-	cl3 = !(vs[3].z >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].z < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].y >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].y < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].x >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].x < -w3);
-
-	if ((cl0 | cl1 | cl2 | cl3) != 0x3f) {
-		return;
-	}
-
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2) | ((!(vs[3].z < -w3)) << 3));
-	vs[2].flags = PVR_CMD_VERTEX;
-	vs[3].flags = PVR_CMD_VERTEX_EOL;
-	int sendverts = 4;
-
-	if (vismask == 15) {
-		goto quad_sendit;
-	} else {
-		switch (vismask)
-		{
-	// quad only 0 visible
-	case 1:
-		sendverts = 3;
-
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-
-	// quad only 1 visible
-	case 2:
-		sendverts = 3;
-
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
-		w2 = wout;
-
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-
-	// quad 0 + 1 visible
-	case 3:
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
-
-		break;
-
-	// quad only 2 visible
-	case 4:
-		sendverts = 3;
-
-		nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[1], w2, w3);
-		w1 = wout;
-
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-
-	// quad 0 + 2 visible
-	case 5:
-		nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-		w1 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
-		w3 = wout;
-
-		break;
-
-	// quad 0 + 1 + 2 visible
-	case 7:
-		sendverts = 5;
-
-		nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
-		w4 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
-
-		vs[3].flags = PVR_CMD_VERTEX;
-
-		break;
-
-	// quad only 3 visible
-	case 8:
-		sendverts = 3;
-
-		nearz_clip(&vs[1], &vs[3], &vs[0], w1, w3);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
-		w2 = wout;
-
-		memcpy32(&vs[1], &vs[3], 32);
-		w1 = w3;
-
-		vs[1].flags = PVR_CMD_VERTEX;
-		vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-
-	// quad 1 + 3 visible
-	case 10:
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
-		nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
-		w2 = wout;
-
-		break;
-
-	// quad 0 + 1 + 3 visible
-	case 11:
-		sendverts = 5;
-
-		nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
-		w4 = wout;
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-
-		vs[3].flags = PVR_CMD_VERTEX;
-
-		break;
-
-	// quad 2 + 3 visible
-	case 12:
-		nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
-		w0 = wout;
-		nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
-		w1 = wout;
-
-		break;
-
-	// quad 0 + 2 + 3 visible
-	case 13:
-		sendverts = 5;
-
-		memcpy32(&vs[4], &vs[3], 32);
-		w4 = w3;
-
-		nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
-		w3 = wout;
-		nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-		w1 = wout;
-
-		vs[3].flags = PVR_CMD_VERTEX;
-		vs[4].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-
-	// quad 1 + 2 + 3 visible
-	case 14:
-		sendverts = 5;
-
-		memcpy32(&vs[4], &vs[2], 32);
-		w4 = w2;
-
-		nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-		w2 = wout;
-		nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-		w0 = wout;
-
-		vs[3].flags = PVR_CMD_VERTEX;
-		vs[4].flags = PVR_CMD_VERTEX_EOL;
-
-		break;
-		}
-	}
-quad_sendit:
-
-	perspdiv(&vs[0], w0);
-	perspdiv(&vs[1], w1);
-	perspdiv(&vs[2], w2);
-	if (sendverts > 3)
-		perspdiv(&vs[3], w3);
-	if (sendverts == 5)
-		perspdiv(&vs[4], w4);
-
-	if (vs[0].oargb < 3) {
-		cur_mode |= vs[0].oargb;
-		if (last_index != texture_index) {
-			last_index = texture_index;
-
-			if (cur_mode != last_mode[texture_index]) {
-				last_mode[texture_index] = cur_mode;
-
-				if (texture_index < TEXTURES_MAX) {
-					update_header(texture_index);
-				}
-			}
-
-			if(__builtin_expect(notex,0)) {
-				pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-			} else {
-				pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-			}
-		}
-
-		pvr_prim(vs, sendverts * 32);
-	} else {
-		int prev_cull = cull_en;
-		render_blend_mode_t prev_blend = blend_mode;
-
-		render_set_blend_mode(RENDER_BLEND_STUPID);
-		render_set_cull_backface(true);
-		last_index = texture_index;
-		last_mode[texture_index] = cur_mode;
-
-		update_header(texture_index);
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		pvr_prim(vs, sendverts * 32);
-
-		render_set_blend_mode(RENDER_BLEND_SPECIAL);
-		last_mode[texture_index] = cur_mode;
-		update_header(texture_index);
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		for (int i=0;i<sendverts;i++) {
-			vs[i].y += 0.00005f;
-			vs[i].z += 0.00005f;
-		}
-
-		pvr_prim(vs, sendverts * 32);
-
-		render_set_blend_mode(prev_blend);
-		render_set_cull_backface(prev_cull);
-	}
-}
-
-
-void render_tri_noxform(uint16_t texture_index, float *w) {
-	int notex = (texture_index == RENDER_NO_TEXTURE);
-	float w0,w1,w2,w3;
-
-	w0 = w[0];
-	w1 = w[1];
-	w2 = w[2];
-
-  	uint8_t cl0, cl1, cl2;
-
-	cl0 = !(vs[0].z >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
-
-	cl1 = !(vs[1].z >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
-
-	cl2 = !(vs[2].z >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
-
-	if ((cl0 | cl1 | cl2) != 0x3f) {
-		return;
-	}
-
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2));
-	int usespare = 0;
-	vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-	if (vismask == 7) {
-		goto tri_sendit;
-	} else {
-		switch (vismask)
-		{
-		case 1:
-			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-			w1 = wout;
-			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-			w2 = wout;
-			break;
-		case 2:
-			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-			w0 = wout;
-			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
-			w2 = wout;
-			break;
-		case 3:
-			usespare = 1;
-			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
-			w3 = wout;
-			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-			w2 = wout;
-			break;
-		case 4:
-			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
-			w0 = wout;
-			nearz_clip(&vs[1], &vs[2], &vs[1], w1, w2);
-			w1 = wout;
-			break;
-		case 5:
-			usespare = 1;
-			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
-			w3 = wout;
-			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
-			w1 = wout;
-			break;
-		case 6:
-			usespare = 1;
-			memcpy32(&vs[3], &vs[2], 32);
-			w3 = w2;
-			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
-			w2 = wout;
-			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-			w0 = wout;
-			break;
-		}
-	}
-tri_sendit:
-
-	perspdiv(&vs[0], w0);
-	perspdiv(&vs[1], w1);
-	perspdiv(&vs[2], w2);
-
-	// don't do anything header-related if we're on the same texture as the last call
-	cur_mode |= vs[0].oargb;
-	if (last_index != texture_index) {
-		last_index = texture_index;
-
-		if (cur_mode != last_mode[texture_index]) {
-			last_mode[texture_index] = cur_mode;
-
-			if (texture_index < TEXTURES_MAX)
-				update_header(texture_index);
-		}
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-	}
-
-
-	if (usespare) {
-		vs[2].flags = PVR_CMD_VERTEX;
-		perspdiv(&vs[3], w3);
-	}
-
-	pvr_prim(vs, 3 * 32);
-	if (usespare)
-		pvr_prim(&vs[3], 32);
-
-	if (vs[0].oargb > 2) {
-		render_blend_mode_t prev_blend = blend_mode;
-		int prev_cull = cull_en;
-		render_set_cull_backface(true);
-		render_set_blend_mode(RENDER_BLEND_LIGHTER);
-
-		last_mode[texture_index] = cur_mode;
-		update_header(texture_index);
-
-		vs[0].oargb = 0;
-		vs[1].oargb = 0;
-		vs[2].oargb = 0;
-		vs[3].oargb = 0;
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		vs[0].z += 0.000025f;
-		vs[1].z += 0.000025f;
-		vs[2].z += 0.000025f;
-		if (usespare)
-			vs[3].z += 0.000025f;
-
-		pvr_prim(vs, 3 * 32);
-		if (usespare)
-			pvr_prim(&vs[3], 32);
-
-		render_set_cull_backface(prev_cull);
-		render_set_blend_mode(prev_blend);
-		last_index = texture_index;
-	}
-}
-
-void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
-	float w0,w1,w2,w3;
-
-	int notex = (texture_index == RENDER_NO_TEXTURE);
-
-	w0 = w[0];
-	w1 = w[1];
-	w2 = w[2];
-	w3 = w[3];
-
-  	uint8_t cl0, cl1, cl2, cl3;
-
-	cl0 = !(vs[0].z >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
-
-	cl1 = !(vs[1].z >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
-
-	cl2 = !(vs[2].z >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
-
-	cl3 = !(vs[3].z >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].z < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].y >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].y < -w3);
-	cl3 = (cl3 << 1) | !(vs[3].x >  w3);
-	cl3 = (cl3 << 1) | !(vs[3].x < -w3);
-
-	if ((cl0 | cl1 | cl2 | cl3) != 0x3f) {
-		return;
-	}
-
-	vs[2].flags = PVR_CMD_VERTEX;
-	vs[3].flags = PVR_CMD_VERTEX_EOL;
-
-	perspdiv(&vs[0], w0);
-	perspdiv(&vs[1], w1);
-	perspdiv(&vs[2], w2);
-	perspdiv(&vs[3], w3);
-
-	if (vs[0].oargb < 3) {
-		if (last_index != texture_index) {
-			last_index = texture_index;
-
-			if (cur_mode != last_mode[texture_index]) {
-				last_mode[texture_index] = cur_mode;
-
-				if (texture_index < TEXTURES_MAX) {
-					update_header(texture_index);
-				}
-			}
-
-			if(__builtin_expect(notex,0)) {
-				pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-			} else {
-				pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-			}
-		}
-
-		vs[0].oargb = 0;
-		vs[1].oargb = 0;
-		vs[2].oargb = 0;
-		vs[3].oargb = 0;
-
-		pvr_prim(vs, 128);
-	} else {
-		int prev_cull = cull_en;
-		render_blend_mode_t prev_blend = blend_mode;
-		render_set_blend_mode(RENDER_BLEND_STUPID);
-		render_set_cull_backface(true);
-		last_index = texture_index;
-		last_mode[texture_index] = cur_mode;
-
-		update_header(texture_index);
-
-		vs[0].oargb = 0;
-		vs[1].oargb = 0;
-		vs[2].oargb = 0;
-		vs[3].oargb = 0;
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		pvr_prim(vs, 128);
-
-		render_set_blend_mode(RENDER_BLEND_SPECIAL);
-		last_mode[texture_index] = cur_mode;
-		update_header(texture_index);
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		vs[0].y += 0.00005f;
-		vs[0].z += 0.00005f;
-		vs[1].y += 0.00005f;
-		vs[1].z += 0.00005f;
-		vs[2].y += 0.00005f;
-		vs[2].z += 0.00005f;
-		vs[3].y += 0.00005f;
-		vs[3].z += 0.00005f;
-		pvr_prim(vs, 128);
-
-		render_set_blend_mode(prev_blend);
-		render_set_cull_backface(prev_cull);
-	}
-}
-
-
-void render_tri_noxform_noclip(uint16_t texture_index, float *w) {
-	float w0,w1,w2;
-
-	int notex = (texture_index == RENDER_NO_TEXTURE);
-
-	w0 = w[0];
-	w1 = w[1];
-	w2 = w[2];
-
- 	uint8_t cl0, cl1, cl2;
-
-	cl0 = !(vs[0].z >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
-	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
-	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
-
-	cl1 = !(vs[1].z >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
-	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
-	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
-
-	cl2 = !(vs[2].z >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
-	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
-	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
-
-	if ((cl0 | cl1 | cl2) != 0x3f) {
-		return;
-	}
-	vs[2].flags = PVR_CMD_VERTEX_EOL;
-
-	perspdiv(&vs[0], w0);
-	perspdiv(&vs[1], w1);
-	perspdiv(&vs[2], w2);
-
-	// don't do anything header-related if we're on the same texture as the last call
-	if (last_index != texture_index) {
-		last_index = texture_index;
-
-		if (cur_mode != last_mode[texture_index]) {
-			last_mode[texture_index] = cur_mode;
-
-			if (texture_index < TEXTURES_MAX)
-				update_header(texture_index);
-		}
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-	}
-
-	pvr_prim(vs, 96);
-
-	if (vs[0].oargb > 2) {
-		render_blend_mode_t prev_blend = blend_mode;
-		int prev_cull = cull_en;
-		render_set_cull_backface(true);
-		render_set_blend_mode(RENDER_BLEND_LIGHTER);
-
-		last_mode[texture_index] = cur_mode;
-		update_header(texture_index);
-
-		if(__builtin_expect(notex,0))
-			pvr_prim(&chdr_notex, sizeof(pvr_poly_hdr_t));
-		else
-			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
-
-		vs[0].z += 0.000025f;
-		vs[1].z += 0.000025f;
-		vs[2].z += 0.000025f;
-		pvr_prim(vs, 96);
-
-		render_set_cull_backface(prev_cull);
-		render_set_blend_mode(prev_blend);
-		last_index = texture_index;
-	}
+	; //
 }

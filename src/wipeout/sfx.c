@@ -71,7 +71,7 @@ void sfx_load(void) {
 	song_attr.stack_size = 32768;
 	song_attr.stack_ptr = NULL;
 	song_attr.prio = 9;
-	song_attr.label = "SONG_WORKER";
+	song_attr.label = "SONG_WORKER";	
 	thd_create_ex(&song_attr, song_worker, NULL);
 
 	// 16 byte blocks: 2 byte header, 14 bytes with 2x4bit samples each
@@ -119,7 +119,7 @@ void sfx_load(void) {
 		if (flags_is(flags, VAG_REGION_START)) {
 			error_if(sources[num_sources].samples == NULL, "VAG_REGION_START without VAG_REGION_END");
 			sources[num_sources].len = &sample_buffer[sample_index] - sources[num_sources].samples;
-			handles[num_sources] = snd_sfx_load_raw_buf((char *)sources[num_sources].samples, sources[num_sources].len, 22050, 8, 1);
+			handles[num_sources] = snd_sfx_load_raw_buf( (char *)sources[num_sources].samples, sources[num_sources].len, 22050, 8, 1);
 			num_sources++;
 		}
 	}
@@ -155,7 +155,7 @@ void sfx_unpause(void) {
 		if (flags_any(nodes[i].flags, SFX_RESERVE)) {
 			sfx_update_ex(&nodes[i]);
 		}
-
+	
 		if (flags_is(nodes[i].flags, SFX_LOOP_PAUSE)) {
 			flags_rm(nodes[i].flags, SFX_LOOP_PAUSE);
 		}
@@ -165,7 +165,6 @@ void sfx_unpause(void) {
 void sfx_pause(void) {
 	unpause_sfx_volume = save.sfx_volume;
 	save.sfx_volume = 0;
-
 	for (int i = 0; i < SFX_MAX; i++) {
 		if (flags_any(nodes[i].flags, SFX_RESERVE)) {
 			sfx_update_ex(&nodes[i]);
@@ -200,7 +199,7 @@ sfx_t *sfx_get_node(sfx_source_t source_index) {
 	sfx->current_pan = 0;
 	sfx->position = 0;
 
-	// Set default pitch. All voice samples are 44khz,
+	// Set default pitch. All voice samples are 44khz, 
 	// other effects 22khz
 	sfx->pitch = source_index >= SFX_VOICE_MINES ? 1.0 : 0.5;
 
@@ -215,9 +214,9 @@ sfx_t *sfx_play(sfx_source_t source_index) {
 	sfx->data.loopstart = 0;
 	sfx->data.loopend = 0;
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 124) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 124) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch == 1.0f ? 44100 : 22050;
 
@@ -246,9 +245,9 @@ sfx_t *sfx_play_at(sfx_source_t source_index, vec3_t pos, vec3_t vel, float volu
 		sfx->data.loopstart = 0;
 		sfx->data.loopend = 0;
 		if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-			sfx->data.vol = (sfx->volume * 124) * unpause_sfx_volume;
+			sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
 		else
-			sfx->data.vol = (sfx->volume * 124) * save.sfx_volume;
+			sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 		sfx->data.pan = 127 + (sfx->pan*128);
 		sfx->data.freq = sfx->pitch * 22050;
 		snd_sfx_play_ex(&sfx->data);
@@ -275,16 +274,16 @@ sfx_t *sfx_reserve_loop(sfx_source_t source_index) {
 	sfx->data.pan = 127;
 	sfx->data.freq = 22050;
 
-	snd_sfx_play_ex(&sfx->data);
+	snd_sfx_play_ex(&sfx->data);	
 
 	return sfx;
 }
 
 void sfx_update_ex(sfx_t *sfx) {
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 124) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 124) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch * 22050;
 
@@ -306,16 +305,15 @@ void sfx_set_position(sfx_t *sfx, vec3_t pos, vec3_t vel, float volume) {
 	sfx->pitch = (262144.0 - away) * 0.0000019073486328125f; // / 524288.0;
 
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 124) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 124) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch * 22050;
 
 	// SORRY, KOS main doesn't have this yet
 	snd_sfx_update_ex(&sfx->data);
 }
-
 
 // Music
 static int cur_hnd = SND_STREAM_INVALID;
@@ -364,7 +362,7 @@ void *song_worker(void *arg) {
 			mutex_lock(&song_mtx);
 			cond_wait(&song_cv, &song_mtx);
 			mutex_unlock(&song_mtx);
-
+		
 			ran = 1;
 		}
 
@@ -397,7 +395,7 @@ void *song_worker(void *arg) {
 			song_interrupted = 1;
 		}
 
-		thd_pass();
+		thd_pass();		
 
 		// if we made it to the end of the song without being interrupted,
 		// do the music logic from the original mixer code
@@ -407,7 +405,7 @@ void *song_worker(void *arg) {
 				music_track_index = rand_int(0, len(def.music));
 				// never repeat a song in random
 				while (music_track_index == last_index) {
-					music_track_index = rand_int(0, len(def.music));
+					music_track_index = rand_int(0, len(def.music));					
 				}
 			}
 			// I'm not sure why there is sequential, it doesn't even get used in the code
@@ -416,7 +414,7 @@ void *song_worker(void *arg) {
 			}
 		}
 
-		thd_pass();
+		thd_pass();		
 	}
 
 	return NULL;

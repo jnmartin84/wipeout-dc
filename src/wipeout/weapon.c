@@ -12,9 +12,7 @@
 
 extern int32_t ctrlNeedTargetIcon;
 extern int ctrlnearShip;
-int16_t Shielded = 0;
-
-
+extern void SetShake(float shake);
 
 weapon_t *weapons;
 int weapons_active = 0;
@@ -211,8 +209,6 @@ void weapons_draw(void) {
 	}
 }
 
-
-
 void weapon_set_trajectory(weapon_t *self) {
 	ship_t *ship = self->owner;
 	track_face_t *face = track_section_get_base_face(ship->section);
@@ -269,7 +265,6 @@ ship_t *weapon_collides_with_ship(weapon_t *self) {
 	return NULL;
 }
 
-
 bool weapon_collides_with_track(weapon_t *self) {
 	if (flags_is(self->section->flags, SECTION_JUMP)) {
 		return false;
@@ -296,7 +291,6 @@ void weapon_update_wait_for_delay(weapon_t *self) {
 	}
 }
 
-
 void weapon_fire_mine(ship_t *ship) {
 	float timer = 0;
 	for (int i = 0; i < WEAPON_MINE_COUNT; i++) {
@@ -309,8 +303,6 @@ void weapon_fire_mine(ship_t *ship) {
 		self->update_func = weapon_update_mine_wait_for_release;
 	}
 }
-
-
 
 void weapon_update_mine_wait_for_release(weapon_t *self) {
 	if (self->timer <= 0) {
@@ -329,6 +321,7 @@ void weapon_update_mine_wait_for_release(weapon_t *self) {
 		}
 	}
 }
+
 #define packcol(rr,gg,bb) (0xff000000 | ((rr) << 16) | ((gg) << 8) | (bb))
 void weapon_update_mine_lights(weapon_t *self, int index) {
 	Prm prm = {.primitive = self->model->primitives};
@@ -362,13 +355,13 @@ void weapon_update_mine(weapon_t *self) {
 		if (flags_not(ship->flags, SHIP_SHIELDED)) {
 			if (ship->pilot == g.pilot) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.125));
-				// SetShake(20); // FIXME
+				SetShake(20);
 			}
 			else {
 				ship->speed = ship->speed * 0.125;
 			}
 		}
-	}
+	}	
 }
 
 
@@ -412,7 +405,7 @@ void weapon_update_missile(weapon_t *self) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.75));
 				ship->angular_velocity.z += rand_float(-0.1, 0.1);
 				ship->turn_rate_from_hit = rand_float(-0.1, 0.1);
-				// SetShake(20);  // FIXME
+				SetShake(20);
 			}
 			else {
 				ship->speed = ship->speed * 0.03125;
@@ -460,7 +453,7 @@ void weapon_update_rocket(weapon_t *self) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.75));
 				ship->angular_velocity.z += rand_float(-0.1, 0.1);;
 				ship->turn_rate_from_hit = rand_float(-0.1, 0.1);;
-				// SetShake(20);  // FIXME
+				SetShake(20);
 			}
 			else {
 				ship->speed = ship->speed * 0.03125;
@@ -565,22 +558,8 @@ void weapon_update_shield(weapon_t *self) {
 			col1 = sinf(color_timer * coords[1]) * 127 + 128;
 			col2 = sinf(color_timer * coords[2]) * 127 + 128;
 
-			//poly.g3->color[0].r = col0;
-			//poly.g3->color[0].g = col0;
-			//poly.g3->color[0].b = 255;
-			//poly.g3->color[0].a = shield_alpha;
 			poly.g3->color[0] = packcola(col0, col0, 255, shield_alpha);
-
-			//poly.g3->color[1].r = col1;
-			//poly.g3->color[1].g = col1;
-			//poly.g3->color[1].b = 255;
-			//poly.g3->color[1].a = shield_alpha;
 			poly.g3->color[1] = packcola(col1, col1, 255, shield_alpha);
-
-			//poly.g3->color[2].r = col2;
-			//poly.g3->color[2].g = col2;
-			//poly.g3->color[2].b = 255;
-			//poly.g3->color[2].a = shield_alpha;
 			poly.g3->color[2] = packcola(col2, col2, 255, shield_alpha);
 			poly.g3 += 1;
 			break;
@@ -593,28 +572,9 @@ void weapon_update_shield(weapon_t *self) {
 			col2 = sinf(color_timer * coords[2]) * 127 + 128;
 			col3 = sinf(color_timer * coords[3]) * 127 + 128;
 
-			//poly.g4->color[0].r = col0;
-			//poly.g4->color[0].g = col0;
-			//poly.g4->color[0].b = 255;
-			//poly.g4->color[0].a = shield_alpha;
 			poly.g4->color[0] = packcola(col0, col0, 255, shield_alpha);
-
-			//poly.g4->color[1].r = col1;
-			//poly.g4->color[1].g = col1;
-			//poly.g4->color[1].b = 255;
-			//poly.g4->color[1].a = shield_alpha;
 			poly.g4->color[1] = packcola(col1, col1, 255, shield_alpha);
-
-			//poly.g4->color[2].r = col2;
-			//poly.g4->color[2].g = col2;
-			//poly.g4->color[2].b = 255;
-			//poly.g4->color[2].a = shield_alpha;
 			poly.g4->color[2] = packcola(col2, col2, 255, shield_alpha);
-
-			//poly.g4->color[3].r = col3;
-			//poly.g4->color[3].g = col3;
-			//poly.g4->color[3].b = 255;
-			//poly.g4->color[3].a = shield_alpha;
 			poly.g4->color[3] = packcola(col3, col3, 255, shield_alpha);
 			poly.g4 += 1;
 			break;

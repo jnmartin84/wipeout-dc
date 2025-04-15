@@ -4,7 +4,6 @@
 #include "mem.h"
 #include "utils.h"
 
-
 static uint8_t __attribute__((aligned(32))) hunk[MEM_HUNK_BYTES];
 static uint32_t bump_len = 0;
 static uint32_t temp_len = 0;
@@ -12,15 +11,10 @@ static uint32_t temp_len = 0;
 static uint32_t temp_objects[MEM_TEMP_OBJECTS_MAX] = {};
 static uint32_t temp_objects_len;
 
-
 // Bump allocator - returns bytes from the front of the hunk
 
 // These allocations persist for many frames. The allocator level is reset
 // whenever we load a new race track or menu in game_set_scene()
-
-uint32_t mem_available(void) {
-	return MEM_HUNK_BYTES - bump_len;
-}
 
 void *mem_mark(void) {
 	return &hunk[bump_len];
@@ -41,8 +35,6 @@ void mem_reset(void *p) {
 	error_if(offset > bump_len || offset > MEM_HUNK_BYTES, "Invalid mem reset");
 	bump_len = offset;
 }
-
-
 
 // Temp allocator - returns bytes from the back of the hunk
 

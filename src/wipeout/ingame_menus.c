@@ -14,7 +14,6 @@
 #include "race.h"
 
 extern int in_race;
-extern void wav_volume(int vol);
 static void page_race_points_init(menu_t * menu);
 static void page_championship_points_init(menu_t * menu);
 static void page_hall_of_fame_init(menu_t * menu);
@@ -74,7 +73,6 @@ static void button_quit_confirm(menu_t *menu, int data) {
 static void button_quit(menu_t *menu, int data) {
 	menu_confirm(menu, "ARE YOU SURE YOU", "WANT TO QUIT", "YES", "NO", button_quit_confirm);
 }
-
 
 static void button_music_track(menu_t *menu, int data) {
 	sfx_music_play(data);
@@ -154,8 +152,7 @@ static void button_race_stats_continue(menu_t *menu, int data) {
 		}
 	}
 }
-int no_fade = 0;
-extern int menu_overlay;
+
 static void page_race_stats_draw(menu_t *menu, int data) {
 	if (platform_screen_size().y == 360) {
 		menu_page_t *page = &menu->pages[menu->index];
@@ -168,16 +165,12 @@ static void page_race_stats_draw(menu_t *menu, int data) {
 		if (g.race_type != RACE_TYPE_TIME_TRIAL) {
 			vec2i_t image_pos = ui_scaled_pos(anchor, vec2i(pos.x + 170, pos.y));
 			uint16_t image = texture_from_list(pilot_portraits, g.race_position <= QUALIFYING_RANK ? 1 : 0);
-			no_fade = 1;
-			menu_overlay = 2;
 			vec2i_t imgsize = render_texture_size(image);
-			imgsize.x = imgsize.x * 3 / 4;
+ 			imgsize.x = imgsize.x * 3 / 4;
 			imgsize.y = imgsize.y * 3 / 4;
 			render_set_depth_test(false);
 			render_push_2d(image_pos, ui_scaled(imgsize), rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
 			render_set_depth_test(true);
-			menu_overlay = 0;
-			no_fade = 0;
 			ui_draw_image(image_pos, image);
 
 			ui_draw_text("RACE POSITION", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
@@ -217,11 +210,7 @@ static void page_race_stats_draw(menu_t *menu, int data) {
 		if (g.race_type != RACE_TYPE_TIME_TRIAL) {
 			vec2i_t image_pos = ui_scaled_pos(anchor, vec2i(pos.x + 180, pos.y));
 			uint16_t image = texture_from_list(pilot_portraits, g.race_position <= QUALIFYING_RANK ? 1 : 0);
-			no_fade = 1;
-			menu_overlay = 2;
 			render_push_2d(image_pos, ui_scaled(render_texture_size(image)), rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
-			menu_overlay = 0;
-			no_fade = 0;
 			ui_draw_image(image_pos, image);
 
 			ui_draw_text("RACE POSITION", ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
@@ -256,7 +245,7 @@ static void page_race_stats_draw(menu_t *menu, int data) {
 menu_t *race_stats_menu_init(void) {
 	sfx_play(SFX_MENU_SELECT);
 	menu_reset(ingame_menu);
-
+	
 	char *title;
 	if (g.race_type == RACE_TYPE_TIME_TRIAL) {
 		title = "";
@@ -448,12 +437,12 @@ static void page_hall_of_fame_draw(menu_t *menu, int data) {
 	// complications
 
 	highscores_t *hs = &save.highscores[g.race_class][g.circut][g.highscore_tab];
-
+	
 	if (hs_entry_complete) {
 		sfx_play(SFX_MENU_SELECT);
 		strncpy(save.highscores_name, hs_new_entry.name, 4);
 		save.is_dirty = true;
-
+		
 		// Insert new highscore entry into the save struct
 		//highscores_entry_t temp_entry = hs->entries[0];
 		for (int i = 0; i < NUM_HIGHSCORES; i++) {
@@ -537,7 +526,7 @@ static void text_scroll_menu_draw(menu_t *menu, int data) {
 			pos.y += 32 * scale;
 		}
 		else {
-			ui_draw_text_centered(line, pos, UI_SIZE_8, UI_COLOR_DEFAULT);
+			ui_draw_text_centered(line, pos, UI_SIZE_8, UI_COLOR_DEFAULT);	
 			pos.y += 12 * scale;
 		}
 	}

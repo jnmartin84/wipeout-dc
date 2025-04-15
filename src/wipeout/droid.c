@@ -105,7 +105,7 @@ void droid_update(droid_t *droid, ship_t *ship) {
 	droid->position = vec3_add(droid->position, vec3_mulf(droid->velocity, 0.015625 * 30 * system_tick()));
 	droid->angle = vec3_add(droid->angle, vec3_mulf(droid->angular_velocity, system_tick()));
 	droid->angle = vec3_wrap_angle(droid->angle);
-
+	
 	if (flags_is(droid->sfx_tractor->flags, SFX_PLAY)) {
 		sfx_set_position(droid->sfx_tractor, droid->position, droid->velocity, 0.5);
 	}
@@ -226,8 +226,9 @@ void droid_update_rescue(droid_t *droid, ship_t *ship) {
 		droid->position = target;
 	}
 	else {
-		droid->velocity = vec3_mulf(distance, 16);
+		droid->velocity = vec3_mulf(distance, 16);	
 	}
+
 
 	// Are we done rescuing?
 	if (flags_not(ship->flags, SHIP_IN_RESCUE)) {

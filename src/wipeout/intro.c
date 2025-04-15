@@ -22,4 +22,5 @@ static void intro_end(void) {
 }
 
 void intro_update(void) {
+	; //
 }

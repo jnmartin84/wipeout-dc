@@ -49,10 +49,17 @@
 	printf("\n"); \
 	exit(1)
 
+#define WIPEOUT_DEBUG 1
+#if WIPEOUT_DEBUG
+
 #define error_if(TEST, ...) \
 	if (TEST) { \
 		die(__VA_ARGS__); \
 	}
+
+#else
+#define error_if(TEST, ...) {}
+#endif
 
 #define flags_add(FLAGS, F)  (FLAGS |= (F))
 #define flags_rm(FLAGS, F)   (FLAGS &= ~(F))
@@ -61,6 +68,8 @@
 #define flags_not(FLAGS, F)  ((FLAGS & (F)) != (F))
 #define flags_none(FLAGS, F) ((FLAGS & (F)) == 0)
 #define flags_set(FLAGS, F)  (FLAGS = (F))
+
+	
 
 char *get_path(const char *dir, const char *file);
 bool str_starts_with(const char *haystack, const char *needle);
@@ -89,7 +98,7 @@ uint32_t file_store(const char *path, void *bytes, int32_t len);
 		swap((LIST)[i], (LIST)[j]); \
 	}
 
-
+#if 0
 static inline uint8_t get_u8(uint8_t *bytes, uint32_t *p) {
 	return bytes[(*p)++];
 }
@@ -164,6 +173,43 @@ static inline uint32_t  get_u32_le(uint8_t *bytes, uint32_t *p) {
 	//v |= bytes[(*p)++] << 16;
 	//v |= bytes[(*p)++] << 24;
 	v = b1 | (b2 << 8) | (b3 << 16) | (b4 << 24);
+	return v;
+}
+#endif
+
+static inline uint8_t get_u8(uint8_t *bytes, uint32_t *p) {
+	return bytes[(*p)++];
+}
+
+static inline uint16_t get_u16(uint8_t *bytes, uint32_t *p) {
+	uint16_t v = 0;
+	v |= bytes[(*p)++] << 8;
+	v |= bytes[(*p)++] << 0;
+	return v;
+}
+
+static inline uint32_t get_u32(uint8_t *bytes, uint32_t *p) {
+	uint32_t v = 0;
+	v |= bytes[(*p)++] << 24;
+	v |= bytes[(*p)++] << 16;
+	v |= bytes[(*p)++] <<  8;
+	v |= bytes[(*p)++] <<  0;
+	return v;
+}
+
+static inline uint16_t get_u16_le(uint8_t *bytes, uint32_t *p) {
+	uint16_t v = 0;
+	v |= bytes[(*p)++] << 0;
+	v |= bytes[(*p)++] << 8;
+	return v;
+}
+
+static inline uint32_t get_u32_le(uint8_t *bytes, uint32_t *p) {
+	uint32_t v = 0;
+	v |= bytes[(*p)++] <<  0;
+	v |= bytes[(*p)++] <<  8;
+	v |= bytes[(*p)++] << 16;
+	v |= bytes[(*p)++] << 24;
 	return v;
 }
 

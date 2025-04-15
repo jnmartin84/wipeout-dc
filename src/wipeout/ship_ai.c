@@ -432,8 +432,11 @@ void ship_ai_update_race(ship_t *self) {
 
 		// Bleed off speed as orientation changes
 
-		self->speed -= fabsf(self->speed * self->angular_velocity.y) * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
-		self->speed -= fabsf(self->speed * self->angular_velocity.x) * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
+		self->speed -= fabsf(self->speed * self->angular_velocity.y)  * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
+		self->speed -= fabsf(self->speed * self->angular_velocity.x)  * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
+
+		self->speed -= fabsf(self->speed * self->angular_velocity.y)  * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
+		self->speed -= fabsf(self->speed * self->angular_velocity.x)  * 0.63661977236758134307553505349006f/* 4 / (twopi_i754) */ * system_tick(); // >> 14
 
 		// If remote has gone over boost
 		if (flags_is(face->flags, FACE_BOOST) && (self->update_strat_func == ship_ai_strat_hold_left || self->update_strat_func == ship_ai_strat_hold_center)) {

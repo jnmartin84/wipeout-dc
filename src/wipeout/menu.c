@@ -75,7 +75,6 @@ void menu_page_add_toggle(menu_page_t *page, int data, char *text, const char **
 }
 
 int sfx_from_menu = 0;
-extern int video_probably_slow;
 void menu_update(menu_t *menu) {
 	render_set_view_2d();
 	
@@ -118,7 +117,7 @@ void menu_update(menu_t *menu) {
 		selected_data = page->entries[page->index].data;
 	}
 
-	if (page->draw_func && ((uintptr_t)page->draw_func != 0xBBBBCCCC)) {
+	if (page->draw_func) {
 		page->draw_func(menu, selected_data);
 	}
 
@@ -190,14 +189,6 @@ void menu_update(menu_t *menu) {
 			if (entry->type == MENU_ENTRY_TOGGLE) {
 				vec2i_t toggle_pos = items_pos;
 				toggle_pos.x += page->block_width - ui_text_width(entry->options[entry->data], UI_SIZE_8);
-				if (((uintptr_t)page->draw_func == 0xBBBBCCCC) && video_probably_slow) {
-					if (video_probably_slow == 1) 
- 						if(!strncmp("DISTANCE", entry->text, 8))
-							text_color = rgba(255,0,0,255);
-					if (video_probably_slow == 2)
-						if (!strncmp("RENDER", entry->text, 6))
-							text_color = rgba(255,0,0,255);
-				}
 				ui_draw_text(entry->options[entry->data], ui_scaled_pos(page->items_anchor, toggle_pos), UI_SIZE_8, text_color);
 			}
 			items_pos.y += 12;

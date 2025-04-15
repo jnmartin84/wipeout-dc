@@ -62,10 +62,8 @@ void hud_load(void) {
 	weapon_icon_textures = image_get_compressed_textures("wipeout/common/wicons.cmp");
 	LOAD_UNFILTERED = 0;
 }
-
 #include <kos.h>
 extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
-
 static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speedo_bar_t *b, float f, rgba_t color_override) {
 	rgba_t left_color, right_color;
 	if (color_override.a > 0) {
@@ -162,23 +160,24 @@ static void hud_draw_speedo_bars(vec2i_t *pos, float f, rgba_t color_override) {
 }
 
 static void hud_draw_speedo(int speed, int thrust) {
-	vec2i_t facia_pos;
-	vec2i_t bar_pos;
+	vec2i_t facia_pos;// = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
+	vec2i_t bar_pos;// = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
 	if (platform_screen_size().y == 360) {
-		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -35));
-		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -30));
+		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
+		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -35));
 	} else {
 		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
 		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
-	}
+	}	//render_set_depth_write(false);
 	hud_draw_speedo_bars(&bar_pos, thrust / 65.0, rgba(255, 0, 0, 128));
 	hud_draw_speedo_bars(&bar_pos, speed / 2166.0, rgba(0, 0, 0, 0));
 	render_push_2d(facia_pos, ui_scaled(render_texture_size(speedo_facia_texture)), rgba(128, 128, 128, 255), speedo_facia_texture);
+	//render_set_depth_write(true);
 }
 
 extern mat4_t __attribute__((aligned(32))) view_mat;
-extern mat4_t __attribute__((aligned(32))) mvp_mat;
-extern mat4_t __attribute__((aligned(32))) vp_mat;
+extern  mat4_t __attribute__((aligned(32))) mvp_mat;
+extern  mat4_t __attribute__((aligned(32))) vp_mat;
 
 void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
 
@@ -274,8 +273,8 @@ void hud_draw(ship_t *ship) {
 
 	// Weapon icon
 	if (ship->weapon_type != WEAPON_TYPE_NONE) {
-		vec2i_t pos;
-		vec2i_t size;
+		vec2i_t pos;// = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 20));
+		vec2i_t size;// = ui_scaled(vec2i(32, 32));
 		if (platform_screen_size().y == 360) {
 			pos = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 15));
 			size = ui_scaled(vec2i(24, 24));

@@ -19,6 +19,8 @@
 
 #include <kos.h>
 
+extern uint32_t mem_available(void);
+
 Object *objects_load(char *name, texture_list_t tl) {
 	uint32_t __attribute__((aligned(32))) p = 0;
 	uint32_t length = 0;
@@ -27,7 +29,10 @@ Object *objects_load(char *name, texture_list_t tl) {
 		die("Failed to load file %s\n", name);
 	}
 
+	// because of padding, start of objectList is not actually this position
+	// but this is where allocator needs to "unwind" to
 	void *mark_it = mem_mark();
+	(void)mark_it;
 
 	Object *objectList;
 	Object *prevObject = NULL;
@@ -35,7 +40,9 @@ Object *objects_load(char *name, texture_list_t tl) {
 	while (p < length) {
 		void *o = mem_bump(sizeof(Object) + 32);
 		Object *object = (Object *)(((uintptr_t)o + 31) & ~31);
+
 		if (p == 0) objectList = object;
+
 		if (prevObject) {
 			prevObject->next = object;
 		}
@@ -47,8 +54,8 @@ Object *objects_load(char *name, texture_list_t tl) {
 
 		void *om = mem_bump(sizeof(mat4_t) + 32);
 		object->mat = (mat4_t *)(((uintptr_t)om + 31) & ~31);
-		memset(object->mat, 0, 64);
 		object->mat->cols[0][0] = object->mat->cols[1][1] = object->mat->cols[2][2] = object->mat->cols[3][3] = 1.0f;
+
 		object->vertices_len = get_i16(bytes, &p); p += 2;
 		object->vertices = NULL; get_i32(bytes, &p);
 		object->normals_len = get_i16(bytes, &p); p += 2;
@@ -92,8 +99,6 @@ Object *objects_load(char *name, texture_list_t tl) {
 			object->vertices[i].z = get_i16(bytes, &p);
 			object->vertices[i].w = 1;
 			p += 2; // padding
-
-			// two different ways to get a radius I guess
 #if 1
 			if (fabsf(object->vertices[i].x) > object->radius) {
 				object->radius = fabsf(object->vertices[i].x);
@@ -117,14 +122,12 @@ Object *objects_load(char *name, texture_list_t tl) {
 			object->normals[i].z = get_i16(bytes, &p);
 			p += 2; // padding
 		}
-
 		float pw,ph;
 		vec2i_t tsize;
 
 		object->primitives = mem_mark();
 		for (int i = 0; i < object->primitives_len; i++) {
 			Prm prm;
-
 			int16_t prm_type = get_i16(bytes, &p);
 			int16_t prm_flag = get_i16(bytes, &p);
 
@@ -181,7 +184,8 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.ft3->u[1] = (float)prm.ft3->u1 * pw;
 				prm.ft3->v[1] = (float)prm.ft3->v1 * ph;
 				prm.ft3->u[2] = (float)prm.ft3->u2 * pw;
-				prm.ft3->v[2] = (float)prm.ft3->v2 * ph;
+				prm.ft3->v[2] = (float)prm.ft3->v2 * ph;				
+
 				break;
 
 			case PRM_TYPE_FT4:
@@ -215,9 +219,10 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.ft4->u[1] = (float)prm.ft4->u1 * pw;
 				prm.ft4->v[1] = (float)prm.ft4->v1 * ph;
 				prm.ft4->u[2] = (float)prm.ft4->u2 * pw;
-				prm.ft4->v[2] = (float)prm.ft4->v2 * ph;
+				prm.ft4->v[2] = (float)prm.ft4->v2 * ph;				
 				prm.ft4->u[3] = (float)prm.ft4->u3 * pw;
-				prm.ft4->v[3] = (float)prm.ft4->v3 * ph;
+				prm.ft4->v[3] = (float)prm.ft4->v3 * ph;				
+
 				break;
 
 			case PRM_TYPE_G3:
@@ -278,7 +283,8 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.gt3->u[1] = (float)prm.gt3->u1 * pw;
 				prm.gt3->v[1] = (float)prm.gt3->v1 * ph;
 				prm.gt3->u[2] = (float)prm.gt3->u2 * pw;
-				prm.gt3->v[2] = (float)prm.gt3->v2 * ph;
+				prm.gt3->v[2] = (float)prm.gt3->v2 * ph;				
+
 				break;
 
 			case PRM_TYPE_GT4:
@@ -315,9 +321,10 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.gt4->u[1] = (float)prm.gt4->u1 * pw;
 				prm.gt4->v[1] = (float)prm.gt4->v1 * ph;
 				prm.gt4->u[2] = (float)prm.gt4->u2 * pw;
-				prm.gt4->v[2] = (float)prm.gt4->v2 * ph;
+				prm.gt4->v[2] = (float)prm.gt4->v2 * ph;				
 				prm.gt4->u[3] = (float)prm.gt4->u3 * pw;
-				prm.gt4->v[3] = (float)prm.gt4->v3 * ph;
+				prm.gt4->v[3] = (float)prm.gt4->v3 * ph;				
+
 				break;
 
 			case PRM_TYPE_LSF3:
@@ -476,6 +483,7 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.lsgt4->color[3] = argb_from_u32(get_u32(bytes, &p));
 				break;
 
+
 			case PRM_TYPE_TSPR:
 			case PRM_TYPE_BSPR:
 				prm.ptr = mem_bump(sizeof(SPR));
@@ -574,101 +582,25 @@ struct SortedSprite_s __attribute__((aligned(32))) sprs[256];
 int sprites_to_draw = 0;
 int max_sprites_to_draw = 0;
 void draw_all_sprites(void) {
-	int coord0,coord1,coord2;
-	uint32_t argb;
 	for (int i=0;i<sprites_to_draw;i++) {
 		struct SortedSprite_s *tmp = &sprs[i];
 		Prm poly = {.primitive = (Primitive*)tmp->ptr};
+		int coord0 = poly.spr->coord;
+
 		render_set_model_mat(tmp->mat);
-		switch (poly.primitive->type) {
-			case PRM_TYPE_TSPR:
-			case PRM_TYPE_BSPR:
-				coord0 = poly.spr->coord;
-				render_push_sprite(
-					vec3(
-						tmp->vertex[coord0].x,
-						tmp->vertex[coord0].y + ((poly.primitive->type == PRM_TYPE_TSPR ? poly.spr->height : -poly.spr->height) >> 1),
-						tmp->vertex[coord0].z
-					),
-					vec2i(poly.spr->width, poly.spr->height),
-					poly.spr->color,
-					poly.spr->texture
-				);
-				break;
-			case PRM_TYPE_GT3:
-				coord0 = poly.gt3->coords[0];
-				coord1 = poly.gt3->coords[1];
-				coord2 = poly.gt3->coords[2];
 
-				//vs[0].flags = PVR_CMD_VERTEX;
-				vs[0].x = tmp->vertex[coord0].x;
-				vs[0].y = tmp->vertex[coord0].y;
-				vs[0].z = tmp->vertex[coord0].z;
-				vs[0].u = poly.gt3->u[0];
-				vs[0].v = poly.gt3->v[0];
-				vs[0].argb = poly.gt3->color[0];
-				vs[0].oargb = poly.gt3->color[0];
-
-				//vs[1].flags = PVR_CMD_VERTEX;
-				vs[1].x = tmp->vertex[coord1].x;
-				vs[1].y = tmp->vertex[coord1].y;
-				vs[1].z = tmp->vertex[coord1].z;
-				vs[1].u = poly.gt3->u[1];
-				vs[1].v = poly.gt3->v[1];
-				vs[1].argb = poly.gt3->color[1];
-				//vs[1].oargb = (poly.gt3->pad1 ? color_to_pvr(poly.gt3->color[1]) : 1);
-
-				vs[2].flags = PVR_CMD_VERTEX_EOL;
-				vs[2].x = tmp->vertex[coord2].x;
-				vs[2].y = tmp->vertex[coord2].y;
-				vs[2].z = tmp->vertex[coord2].z;
-				vs[2].u = poly.gt3->u[2];
-				vs[2].v = poly.gt3->v[2];
-				vs[2].argb = poly.gt3->color[2];
-
-				render_tri(poly.gt3->texture);
-
-				break;
-			case PRM_TYPE_FT3:
-				argb = poly.ft3->color;
-
-				coord0 = poly.ft3->coords[0];
-				coord1 = poly.ft3->coords[1];
-				coord2 = poly.ft3->coords[2];
-
-				//vs[0].flags = PVR_CMD_VERTEX;
-				vs[0].x = tmp->vertex[coord0].x;
-				vs[0].y = tmp->vertex[coord0].y;
-				vs[0].z = tmp->vertex[coord0].z;
-				vs[0].u = poly.ft3->u[0];
-				vs[0].v = poly.ft3->v[0];
-				vs[0].argb = argb;
-				vs[0].oargb = argb;
-
-				//vs[1].flags = PVR_CMD_VERTEX;
-				vs[1].x = tmp->vertex[coord1].x;
-				vs[1].y = tmp->vertex[coord1].y;
-				vs[1].z = tmp->vertex[coord1].z;
-				vs[1].u = poly.ft3->u[1];
-				vs[1].v = poly.ft3->v[1];
-				vs[1].argb = argb;
-				//vs[1].oargb = oargb;
-
-				vs[2].flags = PVR_CMD_VERTEX_EOL;
-				vs[2].x = tmp->vertex[coord2].x;
-				vs[2].y = tmp->vertex[coord2].y;
-				vs[2].z = tmp->vertex[coord2].z;
-				vs[2].u = poly.ft3->u[2];
-				vs[2].v = poly.ft3->v[2];
-				vs[2].argb = argb;
-				//vs[2].oargb = oargb;
-
-				render_tri(poly.ft3->texture);
-				break;
-			default:
-				break;
-		}
+		render_push_sprite(
+			vec3(
+				tmp->vertex[coord0].x,
+				tmp->vertex[coord0].y + ((poly.primitive->type == PRM_TYPE_TSPR ? poly.spr->height : -poly.spr->height) >> 1),
+				tmp->vertex[coord0].z
+			),
+			vec2i(poly.spr->width, poly.spr->height),
+			poly.spr->color,
+			poly.spr->texture
+		);
 	}
+
 	sprites_to_draw = 0;
 }
 
@@ -680,9 +612,7 @@ void emplace_ssp(uint8_t *p, mat4_t *mat, vector_t *v) {
 	rsp->vertex = v;
 }
 
-
 static float __attribute__((aligned(32))) w[4];
-
 static void (*quadfunc)(uint16_t texture_index, float *w);
 static void (*trifunc)(uint16_t texture_index, float *w);
 
@@ -694,7 +624,6 @@ void object_draw(Object *object, mat4_t *mat) {
 	int primitives_len = object->primitives_len;
 
 	render_set_model_mat(mat);
-
 	int wtest = xform_all_verts(object->xform, object->vertices, object->vertices_len);
 
 	if (wtest) {
@@ -705,7 +634,6 @@ void object_draw(Object *object, mat4_t *mat) {
 		trifunc = render_tri_noxform;
 	}
 
-#define USEW 1
 	// TODO: check for PRM_SINGLE_SIDED
 	for (int i = 0; i < primitives_len; i++) {
 		int coord0;
@@ -747,11 +675,10 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[2].argb = poly.gt3->color[2];
 			//vs[2].oargb = (poly.gt3->pad1 ? color_to_pvr(poly.gt3->color[2]) : 1);
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
-#endif
+
 			trifunc(poly.gt3->texture, w);
 
 			poly.gt3 += 1;
@@ -799,12 +726,10 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[3].argb = poly.gt4->color[3];
 			//vs[3].oargb = 1;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
 			w[3] = object->xform[coord3].w;
-#endif
 
 			quadfunc(poly.gt4->texture, w);
 
@@ -813,7 +738,6 @@ void object_draw(Object *object, mat4_t *mat) {
 
 		case PRM_TYPE_FT3:
 			argb = poly.ft3->color;
-
 			coord0 = poly.ft3->coords[0];
 			coord1 = poly.ft3->coords[1];
 			coord2 = poly.ft3->coords[2];
@@ -845,11 +769,9 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[2].argb = argb;
 			//vs[2].oargb = oargb;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
-#endif
 
 			trifunc(poly.ft3->texture, w);
 
@@ -899,12 +821,10 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[3].argb = argb;
 			//vs[3].oargb = 0;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
 			w[3] = object->xform[coord3].w;
-#endif
 
 			quadfunc(poly.ft4->texture, w);
 
@@ -937,11 +857,9 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[2].argb = poly.g3->color[2];
 			//vs[2].oargb = 1;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
-#endif
 
 			trifunc(RENDER_NO_TEXTURE, w);
 
@@ -982,12 +900,10 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[3].argb = poly.g4->color[3];
 			//vs[3].oargb = 1;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
 			w[3] = object->xform[coord3].w;
-#endif
 
 			quadfunc(RENDER_NO_TEXTURE, w);
 
@@ -996,7 +912,6 @@ void object_draw(Object *object, mat4_t *mat) {
 
 		case PRM_TYPE_F3:
 			argb = poly.f3->color;
-
 			coord0 = poly.f3->coords[0];
 			coord1 = poly.f3->coords[1];
 			coord2 = poly.f3->coords[2];
@@ -1022,11 +937,9 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[2].argb = argb;
 			//vs[2].oargb = 0;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
-#endif
 
 			trifunc(RENDER_NO_TEXTURE, w);
 
@@ -1035,7 +948,6 @@ void object_draw(Object *object, mat4_t *mat) {
 
 		case PRM_TYPE_F4:
 			argb = poly.f4->color;
-
 			coord0 = poly.f4->coords[0];
 			coord1 = poly.f4->coords[1];
 			coord2 = poly.f4->coords[2];
@@ -1069,12 +981,10 @@ void object_draw(Object *object, mat4_t *mat) {
 			vs[3].argb = argb;
 			//vs[3].oargb = 0;
 
-#if USEW
 			w[0] = object->xform[coord0].w;
 			w[1] = object->xform[coord1].w;
 			w[2] = object->xform[coord2].w;
 			w[3] = object->xform[coord3].w;
-#endif
 
 			quadfunc(RENDER_NO_TEXTURE, w);
 

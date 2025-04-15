@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <kos.h>
+
 typedef struct rgba_t {
 	uint8_t r, g, b, a;
 } rgba_t;
@@ -15,11 +16,9 @@ typedef struct {
 	float x, y;
 } vec2_t;
 
-
 typedef struct {
 	int32_t x, y;
 } vec2i_t;
-
 
 typedef struct {
 	float x, y, z;
@@ -70,7 +69,9 @@ typedef struct {
 #define recip2pi 0.1591549386630056853734159179072f
 #define recip4k 0.000244140625f
 #define f8over4k 0.001953125f
+
 #define approx_recip(x) (1.0f / sqrtf((x)*(x)))
+
 static inline float bump_atan2f(const float y, const float x)
 {
 	float abs_y = fabsf(y) + 1e-10f;
@@ -95,7 +96,6 @@ static inline vec2i_t vec2i_mulf(vec2i_t a, float f) {
 		a.y * f
 	);
 }
-
 
 static inline vec3_t vec3_add(vec3_t a, vec3_t b) {
 	return vec3(
@@ -133,7 +133,7 @@ static inline vec3_t vec3_inv(vec3_t a) {
 	return vec3(-a.x, -a.y, -a.z);
 }
 
-// this is never called with negative , i checked
+// this is never called with negative, I checked (repeatedly)
 static inline vec3_t vec3_divf(vec3_t a, float f) {
 	float rf = approx_recip(f);
 	return vec3(
@@ -149,11 +149,6 @@ static inline float vec3_len(vec3_t a) {
 	return len;
 }
 
-extern mat4_t __attribute__((aligned(32))) cross_mat;
-extern mat4_t __attribute__((aligned(32))) store_mat;
-
-#include <kos.h>
-
 static inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
  	return vec3(
 		a.y * b.z - a.z * b.y,
@@ -163,7 +158,6 @@ static inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
 }
 
 static inline float vec3_dot(vec3_t a, vec3_t b) {
-	//return a.x * b.x + a.y * b.y + a.z * b.z;
 	float dot;
 	vec3f_dot(a.x, a.y, a.z, b.x, b.y, b.z, dot);
 	return dot;
@@ -194,13 +188,12 @@ static inline float wrap_angle(float a) {
 }
 
 uint32_t argb_from_u32(uint32_t v);
-rgba_t __attribute__((noinline)) rgba_from_u32(uint32_t v);
 float vec3_angle(vec3_t a, vec3_t b);
 vec3_t vec3_wrap_angle(vec3_t a);
 vec3_t vec3_normalize(vec3_t a);
 vec3_t vec3_project_to_ray(vec3_t p, vec3_t r0, vec3_t r1);
 float vec3_distance_to_plane(vec3_t p, vec3_t plane_pos, vec3_t plane_normal);
-vec3_t vec3_reflect(vec3_t incidence, vec3_t normal, float f);
+vec3_t vec3_reflect(vec3_t incidence, vec3_t normal);
 
 float wrap_angle(float a);
 
@@ -210,6 +203,5 @@ void mat4_set_translation(mat4_t *mat, vec3_t pos);
 void mat4_set_yaw_pitch_roll(mat4_t *m, vec3_t rot);
 void mat4_set_roll_pitch_yaw(mat4_t *mat, vec3_t rot);
 void mat4_translate(mat4_t *mat, vec3_t translation);
-void mat4_mul(mat4_t *res, mat4_t *a, mat4_t *b);
 
 #endif

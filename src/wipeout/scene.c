@@ -121,85 +121,25 @@ void scene_update(void) {
 		scene_update_aurora_borealis();
 	}
 }
-extern pvr_poly_hdr_t chdr_opnotex;
+
 extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
-int sky_done = 0;
 extern pvr_dr_state_t dr_state;
-extern float RDSQ;
-int in_sky = 0;
-extern int letterbox;
 void scene_draw(camera_t *camera) {
 	// Sky
 	render_set_depth_write(false);
 	mat4_set_translation(sky_object->mat, vec3_add(camera->position, sky_offset));
-	in_sky = 1;
 	object_draw(sky_object, sky_object->mat);
-	in_sky = 0;
 	render_set_depth_write(true);
-	if(letterbox) {
-		pvr_prim(&chdr_opnotex, 32);
 
-		vs[0].x = 0;
-		vs[0].y = 60;
-		vs[0].z = 20;
-		vs[0].argb = 0xff000000;
-		vs[0].oargb = 0;
-
-		vs[1].x = 0;
-		vs[1].y = 0;
-		vs[1].z = 20;
-		vs[1].argb = 0xff000000;
-		vs[1].oargb = 0;
-
-		vs[2].x = 640;
-		vs[2].y = 60;
-		vs[2].argb = 0xff000000;
-		vs[2].z = 20;
-		vs[2].oargb = 0;
-
-		vs[3].x = 640;
-		vs[3].y = 0;
-		vs[3].z = 20;
-		vs[3].argb = 0xff000000;
-		vs[3].oargb = 0;
-
-		pvr_prim(vs, 128);
-
-		vs[0].x = 0;
-		vs[0].y = 480;
-		vs[0].z = 20;
-		vs[0].argb = 0xff000000;
-		vs[0].oargb = 0;
-
-		vs[1].x = 0;
-		vs[1].y = 420;
-		vs[1].z = 20;
-		vs[1].argb = 0xff000000;
-		vs[1].oargb = 0;
-
-		vs[2].x = 640;
-		vs[2].y = 480;
-		vs[2].argb = 0xff000000;
-		vs[2].z = 20;
-		vs[2].oargb = 0;
-
-		vs[3].x = 640;
-		vs[3].y = 420;
-		vs[3].z = 20;
-		vs[3].argb = 0xff000000;
-		vs[3].oargb = 0;
-
-		pvr_prim(vs, 128);
-	}
 	// sky rendering uses open OP list
 	// close it and open TR for everything else
 	pvr_list_finish();
  	pvr_list_begin(PVR_LIST_TR_POLY);
 	pvr_dr_init(&dr_state);
 
-	// Objects
+	// scenery/object draw distance for player ship current track section
 	float drawdist = g.track.sections[g.ships[g.pilot].section_num].scenedist;
-	//render_reset_proj(drawdist);
+
 	// Calculate the camera forward vector, so we can cull everything that's
 	// behind. Ideally we'd want to do a full frustum culling here. FIXME.
 	vec3_t cam_pos = camera->position;
@@ -211,7 +151,7 @@ void scene_draw(camera_t *camera) {
 		float cam_dot = vec3_dot(diff, cam_dir);
 		float dist_sq = vec3_dot(diff, diff);
 		if (
-			cam_dot < object->radius &&
+			cam_dot < object->radius && 
 			dist_sq < drawdist
 		) {
 			object_draw(object, object->mat);
@@ -222,7 +162,9 @@ void scene_draw(camera_t *camera) {
 }
 
 void scene_set_start_booms(int light_index) {
+	
 	int lights_len = 1;
+//	rgba_t color = rgba(0, 0, 0, 0);
 	uint32_t color = 0x00000000;
 
 	if (light_index == 0) { // reset all 3
@@ -322,11 +264,9 @@ void scene_update_aurora_borealis(void) {
 		if (aurora_borealis.grey_coords[i] != -2) {
 			aurora_borealis.primitives[i]->color[0] = packcol(rN(0), gN(0), bN(0), 0xff);
 		}
-
 		if (aurora_borealis.grey_coords[i] != -2) {
 			aurora_borealis.primitives[i]->color[1] = packcol(rN(1), gN(1), bN(1), 0xff);
 		}
-
 		if (aurora_borealis.grey_coords[i] != -1) {
 			aurora_borealis.primitives[i]->color[2] = packcol(rN(2), gN(2), bN(2), 0xff);
 		}

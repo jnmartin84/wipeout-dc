@@ -5,7 +5,6 @@
 #include "utils.h"
 
 // lifted HSV scaling from Doom 64, thanks
-
 #define recip60 0.01666666753590106964111328125f
 #define MAXINT ((int)0x7fffffff) /* max pos 32-bit int */
 #define MININT ((int)0x80000000) /* max negative 32-bit integer */
@@ -188,18 +187,17 @@ uint32_t argb_from_u32(uint32_t v) {
 	_v = hsv & 0xFF;
 
 	factor = _v;
-
-	l_flt = (float)factor * 1.75f; // 2.0f;
+			
+	l_flt = (float)factor * 2.0f;//1.75f;
 
 	_v = (int)l_flt;
 
 	if (_v < 0)
 		_v = 0;
 	if (_v > 255)
-		_v = 255;
-
+		_v = 255;			
+			
 	int rgb = LightGetRGB(h, s, _v);
-
 	return 0xff000000 | (rgb & 0x00ffffff);
 }
 
@@ -226,8 +224,7 @@ float vec3_angle(vec3_t a, vec3_t b) {
 // this is how I know the clamp isn't needed
 //	if (cosine < -1.0f) printf("cosine < -1\n");
 //	if (cosine > 1.0f) printf("cosine > 1\n");
-
-	return acosf(/*clamp(*/cosine/*, -1, 1)*/);
+	return acosf(/* clamp( */cosine/* , -1, 1) */);
 }
 
 // this gets used to resolve ship-ship collisions
@@ -265,20 +262,12 @@ vec3_t vec3_project_to_ray(vec3_t p, vec3_t r0, vec3_t r1) {
 float vec3_distance_to_plane(vec3_t p, vec3_t plane_pos, vec3_t plane_normal) {
 	float dot_product = vec3_dot(vec3_sub(plane_pos, p), plane_normal);
 	float norm_dot_product = vec3_dot(vec3_inv(plane_normal), plane_normal);
-
-	float rndp = approx_recip(norm_dot_product);
-	if (norm_dot_product < 0) {
-		rndp = -rndp;
-	}
-
+	float rndp = copysignf(approx_recip(norm_dot_product), norm_dot_product);
 	return dot_product * rndp;
 }
 
-vec3_t vec3_reflect(vec3_t incidence, vec3_t normal, float f) {
-	//return vec3_add(incidence, vec3_mulf(normal, vec3_dot(normal, vec3_mulf(incidence, -1)) * f));
-
-	// double-check this
-	return vec3_add(incidence, vec3_mulf(normal, vec3_dot(normal, vec3_inv(incidence)) * f));
+vec3_t vec3_reflect(vec3_t incidence, vec3_t normal) {
+	return vec3_add(incidence, vec3_mulf(normal, vec3_dot(normal, vec3_mulf(incidence, -2.0)))); 
 }
 
 void mat4_set_translation(mat4_t *mat, vec3_t pos) {
@@ -330,33 +319,4 @@ void mat4_translate(mat4_t *mat, vec3_t translation) {
 	mat->m[13] = fipr(mat->m[1], mat->m[5], mat->m[9], mat->m[13], translation.x, translation.y, translation.z, 1);
 	mat->m[14] = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], translation.x, translation.y, translation.z, 1);
 	mat->m[15] = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], translation.x, translation.y, translation.z, 1);
-}
-
-void mat4_mul_fipr(mat4_t *res, mat4_t *a, mat4_t *b) {
-	res->m[ 0] = fipr(b->m[ 0],b->m[ 1],b->m[ 2],b->m[ 3],a->m[0], a->m[4], a->m[ 8], a->m[12]);
-	res->m[ 1] = fipr(b->m[ 0],b->m[ 1],b->m[ 2],b->m[ 3],a->m[1], a->m[5], a->m[ 9], a->m[13]);
-	res->m[ 2] = fipr(b->m[ 0],b->m[ 1],b->m[ 2],b->m[ 3],a->m[2], a->m[6], a->m[10], a->m[14]);
-	res->m[ 3] = fipr(b->m[ 0],b->m[ 1],b->m[ 2],b->m[ 3],a->m[3], a->m[7], a->m[11], a->m[15]);
-
-	res->m[ 4] = fipr(b->m[ 4],b->m[ 5],b->m[ 6],b->m[7],a->m[0], a->m[4], a->m[ 8], a->m[12]);
-	res->m[ 5] = fipr(b->m[ 4],b->m[ 5],b->m[ 6],b->m[7],a->m[1], a->m[5], a->m[ 9], a->m[13]);
-	res->m[ 6] = fipr(b->m[ 4],b->m[ 5],b->m[ 6],b->m[7],a->m[2], a->m[6], a->m[10], a->m[14]);
-	res->m[ 7] = fipr(b->m[ 4],b->m[ 5],b->m[ 6],b->m[7],a->m[3], a->m[7], a->m[11], a->m[15]);
-
-	res->m[ 8] = fipr(b->m[ 8],b->m[ 9],b->m[10],b->m[11],a->m[0], a->m[4], a->m[ 8], a->m[12]);
-	res->m[ 9] = fipr(b->m[ 8],b->m[ 9],b->m[10],b->m[11],a->m[1], a->m[5], a->m[ 9], a->m[13]);
-	res->m[10] = fipr(b->m[ 8],b->m[ 9],b->m[10],b->m[11],a->m[2], a->m[6], a->m[10], a->m[14]);
-	res->m[11] = fipr(b->m[ 8],b->m[ 9],b->m[10],b->m[11],a->m[3], a->m[7], a->m[11], a->m[15]);
-
-	res->m[12] = fipr(b->m[12],b->m[13],b->m[14],b->m[15],a->m[0], a->m[4], a->m[ 8], a->m[12]);
-	res->m[13] = fipr(b->m[12],b->m[13],b->m[14],b->m[15],a->m[1], a->m[5], a->m[ 9], a->m[13]);
-	res->m[14] = fipr(b->m[12],b->m[13],b->m[14],b->m[15],a->m[2], a->m[6], a->m[10], a->m[14]);
-	res->m[15] = fipr(b->m[12],b->m[13],b->m[14],b->m[15],a->m[3], a->m[7], a->m[11], a->m[15]);
-}
-
-extern void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
-
-void mat4_mul(mat4_t *res, mat4_t *a, mat4_t *b) {
-	(void)res;
-	mat_load_apply((matrix_t *)&a->cols[0][0], (matrix_t *)&b->cols[0][0]);
 }

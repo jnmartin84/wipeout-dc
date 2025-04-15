@@ -9,6 +9,13 @@
 
 #include <string.h>
 #include <sys/time.h>
+
+#include <kos.h>
+#include <dc/maple.h>
+#include <dc/maple/controller.h>
+#include <dc/vmu_fb.h>
+#include <dc/vmu_pkg.h>
+
 extern uint8_t allow_exit;
 static volatile /* bool */int wants_to_exit = 0;
 void *gamepad;
@@ -27,13 +34,9 @@ void *platform_find_gamepad(void) {
 	return NULL;
 }
 
-
-#include <dc/maple.h>
-#include <dc/maple/controller.h>
-
 int if_to_await = 0;
 
-#define configDeadzone (0x04) // 0x20
+#define configDeadzone (0x04)
 
 uint16_t old_buttons = 0, rel_buttons = 0;
 
@@ -64,8 +67,8 @@ void platform_pump_events()
 	float stick_y = 0;
 
 	if (magnitude_sq > (uint32_t)(configDeadzone * configDeadzone)) {
-		stick_x = clamp(((float)last_joyx / 127.0f)/*  * 2.0f */, -1.0f, 1.0f);
-		stick_y = clamp(((float)last_joyy / 127.0f)/*  * 2.0f */, -1.0f, 1.0f);
+		stick_x = clamp(((float)last_joyx / 127.0f), -1.0f, 1.0f);
+		stick_y = clamp(((float)last_joyy / 127.0f), -1.0f, 1.0f);
 	}
 
 	// joystick
@@ -115,7 +118,7 @@ void platform_pump_events()
 	old_buttons = state->buttons;
 }
 
-float Sys_FloatTime(void) {
+static float Sys_FloatTime(void) {
   struct timeval tp;
   struct timezone tzp;
   static int secbase;
@@ -131,7 +134,6 @@ float Sys_FloatTime(void) {
 
   return (tp.tv_sec - secbase) + tp.tv_usec * divisor;
 }
-
 
 float platform_now(void) {
 	return (float)Sys_FloatTime();
@@ -160,10 +162,6 @@ uint8_t *platform_load_asset(const char *name, uint32_t *bytes_read) {
 	return file_load(path, bytes_read);
 }
 
-
-#include <kos.h>
-#include <dc/vmu_fb.h>
-#include <dc/vmu_pkg.h>
 
 char *get_vmu_fn(maple_device_t *vmudev, char *fn);
 int vmu_check(void);
@@ -344,15 +342,19 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 extern	vec2i_t screen_size;
 
 void platform_video_init(void) {
+	; //
 }
 
 void platform_video_cleanup(void) {
+	; //
 }
 
 void platform_prepare_frame(void) {
+	; //
 }
 
 void platform_end_frame(void) {
+	; //
 }
 
 rgba_t *platform_get_screenbuffer(int32_t *pitch) {
@@ -390,6 +392,7 @@ int main(int argc, char *argv[]) {
 			exit(-1);
 		}
 	}
+
 	if (snd_stream_init() < 0)
 		exit(-1);
 

@@ -78,7 +78,6 @@ typedef struct track_t {
 	int32_t pickups_len;
 	int32_t total_section_nums;
 	texture_list_t textures;
-
 	track_face_t *faces;
 	pvr_vertex_t *apvr;
 	section_t *sections;

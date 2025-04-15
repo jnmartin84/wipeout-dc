@@ -165,7 +165,7 @@ void input_init(void) {
 }
 
 void input_cleanup(void) {
-
+	; //
 }
 
 void input_clear(void) {
@@ -262,18 +262,15 @@ void input_unbind_all(input_layer_t layer) {
 	}
 }
 
-
 float input_state(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
 	return actions_state[action];
 }
 
-
 bool input_pressed(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
 	return actions_pressed[action];
 }
-
 
 bool input_released(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
@@ -283,7 +280,6 @@ bool input_released(uint8_t action) {
 vec2_t input_mouse_pos(void) {
 	return vec2(mouse_x, mouse_y);
 }
-
 
 button_t input_name_to_button(const char *name) {
 	for (int32_t i = 0; i < INPUT_BUTTON_MAX; i++) {

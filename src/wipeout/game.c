@@ -194,7 +194,14 @@ const game_def_t def = {
 		"#PROGRAMMERS",
 			"JNMARTIN84",
 			"MRNEO240",
-		"#VMU ASSETS",			
+                "#THIRD PARTY CODE", // + 3
+			"FALCO GIRGIS",
+                        "KAZADE",
+		"#MODELING", // + 4
+			"BRUCE",
+			"DEREK ATEAM",
+			"EGREGIOUSGUY",
+		"#VMU ASSETS",
 			"STIFFPEAKS",
 		"#CASE ART",
 			"STIFFPEAKS",
@@ -203,15 +210,16 @@ const game_def_t def = {
 		"#SPECIAL THANKS TO",
 			"THESEGAGURU",
 			"PCERCUEI",
-			"FREAKDAVE",
-			"FALCO GIRGIS",
+			"FREAKDAVE", // -1
 			"",
 			"SIMULANT DISCORD",
 			"KALLISTIOS TEAM",
 			"",
 			"",
-		"#IF YOU PAID FOR THIS",
-		"#YOU GOT RIPPED OFF",
+		"#IF YOU PAID",
+		"#FOR THIS", // +1
+		"#YOU GOT", // +1
+		"#RIPPED OFF",
 			"",
 			"",
 		"#MANAGING DIRECTORS",
@@ -419,7 +427,7 @@ save_t save = {
 	.magic = SAVE_DATA_MAGIC,
 	.is_dirty = true,
 
-	.sfx_volume = 0.5,
+	.sfx_volume = 0.8,
 	.music_volume = 0.4,
 	.internal_roll = 0.6,
 	.ui_scale = 0,
@@ -429,7 +437,7 @@ save_t save = {
 	.shading = true,
 	.show_fps = false,
 	.fullscreen = true,
-	.screen_res = RENDER_RES_169A,
+	.screen_res = RENDER_RES_43,
 	.post_effect = 0,
 
 	.has_rapier_class = false,  // for testing; should be false in prod
@@ -514,7 +522,6 @@ save_t save = {
 
 game_t g = {0};
 
-
 extern int in_menu;
 struct {
 	void (*init)(void);
@@ -531,8 +538,6 @@ static game_scene_t scene_next = GAME_SCENE_NONE;
 static int global_textures_len = 0;
 static void *global_mem_mark = 0;
 
-float RENDERDIST = RENDER_FADEOUT_FAR;
-float RDSQ = RENDER_FADEOUT_FAR * RENDER_FADEOUT_FAR;
 void game_init(void) {
 	uint32_t size;
 	save_t *save_file = (save_t *)platform_load_userdata("save.dat", &size);
@@ -544,13 +549,6 @@ void game_init(void) {
 
 		mem_temp_free(save_file);
 	}
-	save.render_dist = 8;
-	save.fade = 0;
-	save.shading = 1;
-
-	// can we get rid of this now?
-	RENDERDIST = RENDER_FADEOUT_FAR + (4000.0f * ((float)save.render_dist * 10.f / 8.0f));
-	RDSQ = RENDERDIST * RENDERDIST;
 
 	render_set_resolution(save.screen_res);
 
