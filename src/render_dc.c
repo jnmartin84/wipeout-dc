@@ -506,11 +506,12 @@ void render_quad(uint16_t texture_index) {
     if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
 		return;
 
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2) | ((!(vs[3].z < -w3)) << 3));
-	vs[2].flags = PVR_CMD_VERTEX;
+	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2) | (((vs[3].z >= -w3)) << 3));
+	//vs[2].flags = PVR_CMD_VERTEX;
 	int sendverts = 4;
 
 	if (vismask == 15) {
+		perspdiv(&vs[3], w3);
 		goto quad_sendit;
 	} else {
 		switch (vismask)
@@ -547,6 +548,8 @@ void render_quad(uint16_t texture_index) {
 			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
 			w3 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad only 2 visible
@@ -569,6 +572,8 @@ void render_quad(uint16_t texture_index) {
 			nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
 			w3 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad 0 + 1 + 2 visible
@@ -582,6 +587,8 @@ void render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -609,6 +616,8 @@ void render_quad(uint16_t texture_index) {
 			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
 			w2 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad 0 + 1 + 3 visible
@@ -622,6 +631,8 @@ void render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -631,6 +642,8 @@ void render_quad(uint16_t texture_index) {
 			w0 = wout;
 			nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
 			w1 = wout;
+
+			perspdiv(&vs[3], w3);
 
 			break;
 
@@ -648,6 +661,8 @@ void render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -665,6 +680,9 @@ void render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
+
 			break;
 		}
 	}
@@ -673,15 +691,11 @@ quad_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-	if (sendverts > 3)
-		perspdiv(&vs[3], w3);
-	if (sendverts == 5)
-		perspdiv(&vs[4], w4);
 
 	// anything but boost/item pads
 	if (vs[0].oargb < 3) {
 		// both of these need to be checked at top level, not one with one nested
-		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 			last_index = texture_index;
 
 			last_mode[texture_index] = cur_mode;
@@ -777,9 +791,9 @@ void render_tri(uint16_t texture_index) {
 	if ((cl0 | cl1 | cl2) != 0x3f)
 		return;
 
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2));
-	int usespare = 0;
-	vs[2].flags = PVR_CMD_VERTEX_EOL;
+	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2));
+	int sendverts = 3;
+//	vs[2].flags = PVR_CMD_VERTEX_EOL;
 
 	if (vismask == 7) {
 		goto tri_sendit;
@@ -801,7 +815,7 @@ void render_tri(uint16_t texture_index) {
 
 			break;
 		case 3:
-			usespare = 1;
+			sendverts = 4;
 
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
@@ -810,6 +824,7 @@ void render_tri(uint16_t texture_index) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		case 4:
@@ -820,7 +835,7 @@ void render_tri(uint16_t texture_index) {
 
 			break;
 		case 5:
-			usespare = 1;
+			sendverts = 4;
 
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
@@ -829,10 +844,11 @@ void render_tri(uint16_t texture_index) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		case 6:
-			usespare = 1;
+			sendverts = 4;
 
 			memcpy32(&vs[3], &vs[2], 32);
 			w3 = w2;
@@ -843,6 +859,7 @@ void render_tri(uint16_t texture_index) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		}
@@ -852,11 +869,9 @@ tri_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-	if (usespare)
-		perspdiv(&vs[3], w3);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
-	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+	if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 		last_index = texture_index;
 
 		last_mode[texture_index] = cur_mode;
@@ -869,9 +884,7 @@ tri_sendit:
 			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
 	}
 
-	pvr_prim(vs, 3 * 32);
-	if (usespare)
-		pvr_prim(&vs[3], 32);
+	pvr_prim(vs, sendverts * 32);
 }
 
 void render_quad_noxform(uint16_t texture_index, float *w) {
@@ -915,14 +928,15 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
     if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
 		return;
 
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2) | ((!(vs[3].z < -w3)) << 3));
+	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2) | (((vs[3].z >= -w3)) << 3));
 
-	vs[2].flags = PVR_CMD_VERTEX;
-	vs[3].flags = PVR_CMD_VERTEX_EOL;
+//	vs[2].flags = PVR_CMD_VERTEX;
+//	vs[3].flags = PVR_CMD_VERTEX_EOL;
 
 	int sendverts = 4;
 
 	if (vismask == 15) {
+		perspdiv(&vs[3], w3);
 		goto quad_sendit;
 	} else {
 		switch (vismask)
@@ -959,6 +973,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 			nearz_clip(&vs[1], &vs[3], &vs[3], w1, w3);
 			w3 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad only 2 visible
@@ -981,6 +997,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 			nearz_clip(&vs[2], &vs[3], &vs[3], w2, w3);
 			w3 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad 0 + 1 + 2 visible
@@ -994,6 +1012,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -1021,6 +1041,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 			nearz_clip(&vs[2], &vs[3], &vs[2], w2, w3);
 			w2 = wout;
 
+			perspdiv(&vs[3], w3);
+
 			break;
 
 		// quad 0 + 1 + 3 visible
@@ -1034,6 +1056,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -1043,6 +1067,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 			w0 = wout;
 			nearz_clip(&vs[1], &vs[3], &vs[1], w1, w3);
 			w1 = wout;
+
+			perspdiv(&vs[3], w3);
 
 			break;
 
@@ -1060,6 +1086,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 
@@ -1077,6 +1105,8 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
+			perspdiv(&vs[4], w4);
 
 			break;
 		}
@@ -1086,14 +1116,9 @@ quad_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-	if (sendverts > 3)
-		perspdiv(&vs[3], w3);
-	if (sendverts == 5)
-		perspdiv(&vs[4], w4);
 
 	if (vs[0].oargb < 3) {
-
-		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 			last_index = texture_index;
 
 			last_mode[texture_index] = cur_mode;
@@ -1183,9 +1208,9 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 	if ((cl0 | cl1 | cl2) != 0x3f)
 		return;
  
-	uint32_t vismask = ((!(vs[0].z < -w0)) | ((!(vs[1].z < -w1)) << 1) | ((!(vs[2].z < -w2)) << 2));
-	int usespare = 0;
-	vs[2].flags = PVR_CMD_VERTEX_EOL;
+	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2));
+	int sendverts = 3;
+//	vs[2].flags = PVR_CMD_VERTEX_EOL;
 
 	if (vismask == 7) {
 		goto tri_sendit;
@@ -1207,7 +1232,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 			break;
 		case 3:
-			usespare = 1;
+			sendverts = 4;
 
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
@@ -1216,6 +1241,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		case 4:
@@ -1226,7 +1252,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 			break;
 		case 5:
-			usespare = 1;
+			sendverts = 4;
 
 			nearz_clip(&vs[1], &vs[2], &vs[3], w1, w2);
 			w3 = wout;
@@ -1235,10 +1261,11 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		case 6:
-			usespare = 1;
+			sendverts = 4;
 
 			memcpy32(&vs[3], &vs[2], 32);
 			w3 = w2;
@@ -1249,6 +1276,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+			perspdiv(&vs[3], w3);
 
 			break;
 		}
@@ -1258,12 +1286,10 @@ tri_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-	if (usespare)
-		perspdiv(&vs[3], w3);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
-	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+	if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 		last_index = texture_index;
 
 		last_mode[texture_index] = cur_mode;
@@ -1276,9 +1302,7 @@ tri_sendit:
 			pvr_prim(chdr[texture_index], sizeof(pvr_poly_hdr_t));
 	}
 
-	pvr_prim(vs, 3 * 32);
-	if (usespare)
-		pvr_prim(&vs[3], 32);
+	pvr_prim(vs, sendverts * 32);
 }
 
 void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
@@ -1292,31 +1316,35 @@ void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 	w2 = w[2];
 	w3 = w[3];
 
-    cl0 = !(vs[0].y >  w0);
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y < -w0);
     cl0 = (cl0 << 1) | !(vs[0].x >  w0);
     cl0 = (cl0 << 1) | !(vs[0].x < -w0);
 
-    cl1 = !(vs[1].y >  w1);
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
     cl1 = (cl1 << 1) | !(vs[1].y < -w1);
     cl1 = (cl1 << 1) | !(vs[1].x >  w1);
     cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
-    cl2 = !(vs[2].y >  w2);
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) |!(vs[2].y >  w2);
     cl2 = (cl2 << 1) | !(vs[2].y < -w2);
     cl2 = (cl2 << 1) | !(vs[2].x >  w2);
     cl2 = (cl2 << 1) | !(vs[2].x < -w2);
 
-    cl3 = !(vs[3].y >  w3);
+    cl3 = !(vs[3].z >  w3);
+    cl3 = (cl3 << 1) | !(vs[3].y >  w3);
     cl3 = (cl3 << 1) | !(vs[3].y < -w3);
     cl3 = (cl3 << 1) | !(vs[3].x >  w3);
     cl3 = (cl3 << 1) | !(vs[3].x < -w3);
 
-    if ((cl0 | cl1 | cl2 | cl3) != 0x0f)
+    if ((cl0 | cl1 | cl2 | cl3) != 0x1f)
 		return;
  
-	vs[2].flags = PVR_CMD_VERTEX;
-	vs[3].flags = PVR_CMD_VERTEX_EOL;
+//	vs[2].flags = PVR_CMD_VERTEX;
+//	vs[3].flags = PVR_CMD_VERTEX_EOL;
 
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
@@ -1324,7 +1352,7 @@ void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 	perspdiv(&vs[3], w3);
 
 	if (vs[0].oargb < 3) {
-		if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+		if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 			last_index = texture_index;
 
 			last_mode[texture_index] = cur_mode;
@@ -1393,34 +1421,37 @@ void render_tri_noxform_noclip(uint16_t texture_index, float *w) {
 	w1 = w[1];
 	w2 = w[2];
 
-    cl0 = !(vs[0].y >  w0);
+    cl0 = !(vs[0].z >  w0);
+    cl0 = (cl0 << 1) | !(vs[0].y >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y < -w0);
     cl0 = (cl0 << 1) | !(vs[0].x >  w0);
     cl0 = (cl0 << 1) | !(vs[0].x < -w0);
 
-    cl1 = !(vs[1].y >  w1);
+    cl1 = !(vs[1].z >  w1);
+    cl1 = (cl1 << 1) | !(vs[1].y >  w1);
     cl1 = (cl1 << 1) | !(vs[1].y < -w1);
     cl1 = (cl1 << 1) | !(vs[1].x >  w1);
     cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
-    cl2 = !(vs[2].y >  w2);
+    cl2 = !(vs[2].z >  w2);
+    cl2 = (cl2 << 1) |!(vs[2].y >  w2);
     cl2 = (cl2 << 1) | !(vs[2].y < -w2);
     cl2 = (cl2 << 1) | !(vs[2].x >  w2);
     cl2 = (cl2 << 1) | !(vs[2].x < -w2);
 
-    if ((cl0 | cl1 | cl2) != 0x0f)
+    if ((cl0 | cl1 | cl2) != 0x1f)
 		return;
 
-	vs[2].flags = PVR_CMD_VERTEX_EOL;
+//	vs[2].flags = PVR_CMD_VERTEX_EOL;
 
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
-	render_set_blend_mode(RENDER_BLEND_NORMAL);
+	//render_set_blend_mode(RENDER_BLEND_NORMAL);
 
-	if (cur_mode != last_mode[texture_index] || last_index != texture_index) {
+	if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 		last_index = texture_index;
 
 		last_mode[texture_index] = cur_mode;
