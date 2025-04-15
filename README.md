@@ -3,7 +3,7 @@
 # Wipeout-Rewrite port for Dreamcast
 
 ***
-Here's the first release. It is feature complete, 100% 60 FPS (at default video settings), music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
+Here's the second release. Extended draw distance, 16:9 anamorphic widescreen available, reimplemented screen shake, many bug-fixes for collision behavior. Feature complete, 100% 60 FPS, music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
 
 ## Download the disc image:
@@ -12,7 +12,7 @@ Here's the first release. It is feature complete, 100% 60 FPS (at default video 
 
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI` file and case art courtesy of `StiffPeaks`.
 
-https://github.com/jnmartin84/wipeout-dc/releases/tag/v1.0
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.0
 
 ***
 
@@ -32,27 +32,10 @@ https://github.com/jnmartin84/wipeout-dc/releases/tag/v1.0
 These may be changed in the controls menu.
 ***
 
-#### Additional menu options for video settings.
-
-The video settings default to the most performant settings. There are several options that can be changed. If you choose a combination known to cause the frame rate to drop below 60 FPS, the entry responsible for the problem will show in red.
-
-##### Recommended video settings:
-`draw distance 0` plus any combination of `distance fade`, `shading`, `texture filter`
-
-OR
-
-`distance fade off`, `draw distance 0` through `draw distance 3`
-
-***
-
-##### Available options
-`Distance fade` - `off`/`on`; alpha fade to 0 at far plane. Similar to fog. Higher values cause slowdown.
-
-`Shading` - `PSX` for use of flat and gouraud shaded polygons, `PC` for all gouraud. Must begin a new race to take effect. May cause a tiny amount of slowdown but mostly unnoticeable.
+##### Available video menu options
+`Display` - `4:3` / `16:9 anamorphic`; standard aspect ratio or "stretched" 16:9 for modern displays
 
 `Texture Filtering` - `on` for bilinear filtering, `off` for point sampling. Must begin a new race to take effect. No negative performance impact.
-
-Note: The shading option is disabled in the code in the repo. It doesn't really make any difference so I am going to remove it in future.
 
 ***
 
@@ -60,7 +43,7 @@ Note: The shading option is disabled in the code in the repo. It doesn't really 
 
 ***
 
-enable Rapier Class and bonus circuit(s).
+enable Rapier Class and bonus circuit.
 ***
 
 ### How to build
