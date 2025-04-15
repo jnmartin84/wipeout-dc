@@ -3,7 +3,7 @@
 # Wipeout-Rewrite port for Dreamcast
 
 ***
-Here's the second release. Extended draw distance, 16:9 anamorphic widescreen available, reimplemented screen shake, many bug-fixes for collision behavior. Feature complete, 100% 60 FPS, music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
+Here's the second release. Extended draw distance, 16:9 anamorphic widescreen available, reimplemented screen shake, many bug-fixes for collision behavior, sound, target lockon indicator, more. Feature complete, 100% 60 FPS, music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
 
 ## Download the disc image:
