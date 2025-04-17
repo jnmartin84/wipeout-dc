@@ -808,6 +808,7 @@ void render_tri(uint16_t texture_index) {
 	} else {
 		switch (vismask)
 		{
+		// triangle only 0 visible
 		case 1:
 			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
 			w1 = wout;
@@ -815,6 +816,7 @@ void render_tri(uint16_t texture_index) {
 			w2 = wout;
 
 			break;
+		// triangle only 1 visible
 		case 2:
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
 			w0 = wout;
@@ -822,6 +824,7 @@ void render_tri(uint16_t texture_index) {
 			w2 = wout;
 
 			break;
+		// triangle 0 + 1 visible
 		case 3:
 			sendverts = 4;
 
@@ -835,6 +838,7 @@ void render_tri(uint16_t texture_index) {
 			perspdiv(&vs[3], w3);
 
 			break;
+		// triangle only 2 visible
 		case 4:
 			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
 			w0 = wout;
@@ -842,6 +846,7 @@ void render_tri(uint16_t texture_index) {
 			w1 = wout;
 
 			break;
+		// triangle 0 + 2 visible
 		case 5:
 			sendverts = 4;
 
@@ -855,6 +860,7 @@ void render_tri(uint16_t texture_index) {
 			perspdiv(&vs[3], w3);
 
 			break;
+		// triangle 1 + 2 visible
 		case 6:
 			sendverts = 4;
 
@@ -1220,6 +1226,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 	} else {
 		switch (vismask)
 		{
+		// triangle only 0 visible
 		case 1:
 			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
 			w1 = wout;
@@ -1227,6 +1234,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 			w2 = wout;
 
 			break;
+		// triangle only 1 visible
 		case 2:
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
 			w0 = wout;
@@ -1234,6 +1242,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 			w2 = wout;
 
 			break;
+		// triangle 0 + 1 visible
 		case 3:
 			sendverts = 4;
 
@@ -1247,6 +1256,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 			perspdiv(&vs[3], w3);
 
 			break;
+		// triangle only 2 visible
 		case 4:
 			nearz_clip(&vs[0], &vs[2], &vs[0], w0, w2);
 			w0 = wout;
@@ -1254,6 +1264,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 			w1 = wout;
 
 			break;
+		// triangle 0 + 2 visible
 		case 5:
 			sendverts = 4;
 
@@ -1267,6 +1278,7 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 			perspdiv(&vs[3], w3);
 
 			break;
+		// triangle 1 + 2 visible
 		case 6:
 			sendverts = 4;
 
