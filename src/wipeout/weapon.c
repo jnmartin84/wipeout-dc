@@ -326,12 +326,13 @@ void weapon_update_mine_wait_for_release(weapon_t *self) {
 void weapon_update_mine_lights(weapon_t *self, int index) {
 	Prm prm = {.primitive = self->model->primitives};
 
-	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * 128 + 128;
+	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * 64 + 191;
 	for (int i = 0; i < 8; i++) {
 		switch (prm.primitive->type) {
+		// TODO - reintroduce ability to either do blending or specular coloring on triangles
 		case PRM_TYPE_GT3:
-			prm.gt3->color[0] = packcol(230,0,0);
-			prm.gt3->color[1] = packcol(r,0x40,0);
+			prm.gt3->color[0] = packcol(255,0,0);
+			prm.gt3->color[1] = packcol(r,0x60,0);
 			prm.gt3->color[2] = prm.gt3->color[1];
 			prm.gt3 += 1;
 			break;
