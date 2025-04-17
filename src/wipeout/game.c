@@ -194,10 +194,11 @@ const game_def_t def = {
 		"#PROGRAMMERS",
 			"JNMARTIN84",
 			"MRNEO240",
-                "#THIRD PARTY CODE", // + 3
+		"#THIRD PARTY CODE",
+			"KAZADE",
 			"FALCO GIRGIS",
-                        "KAZADE",
-		"#MODELING", // + 4
+			"BBHOODSTA",
+		"#MODELING",
 			"BRUCE",
 			"DEREK ATEAM",
 			"EGREGIOUSGUY",
@@ -205,23 +206,14 @@ const game_def_t def = {
 			"STIFFPEAKS",
 		"#CASE ART",
 			"STIFFPEAKS",
-			"",
-			"",
 		"#SPECIAL THANKS TO",
 			"THESEGAGURU",
 			"PCERCUEI",
-			"FREAKDAVE", // -1
-			"",
+			"FREAKDAVE",
 			"SIMULANT DISCORD",
 			"KALLISTIOS TEAM",
-			"",
-			"",
-		"#IF YOU PAID",
-		"#FOR THIS", // +1
-		"#YOU GOT", // +1
-		"#RIPPED OFF",
-			"",
-			"",
+		"#IF YOU PAID FOR THIS",
+		"#YOU GOT RIPPED OFF",
 		"#MANAGING DIRECTORS",
 			"IAN HETHERINGTON",
 			"JONATHAN ELLIS",
@@ -234,8 +226,6 @@ const game_def_t def = {
 			"SUE CAMPBELL",
 		"#GAME DESIGNER",
 			"NICK BURCOMBE",
-			"",
-			"",
 		"#PLAYSTATION VERSION",
 		"#PROGRAMMERS",
 			"DAVE ROSE",
@@ -267,8 +257,6 @@ const game_def_t def = {
 		"#PACKAGING DESIGN",
 			"THE DESIGNERS REPUBLIC",
 			"KEITH HOPWOOD",
-			"",
-			"",
 		"#PC VERSION",
 		"#PROGRAMMERS",
 			"ANDY YELLAND",
@@ -286,8 +274,6 @@ const game_def_t def = {
 		"#CONVERSION ARTISTS",
 			"JOHN DWYER",
 			"GARY BURLEY",
-			"",
-			"",
 		"#ATI 3D RAGE VERSION",
 		"#PRODUCER",
 			"BILL ALLEN",
@@ -295,17 +281,11 @@ const game_def_t def = {
 		"#BROADSWORD INTERACTIVE LTD",
 			"STEPHEN ROSE",
 			"JOHN JONES STEELE",
-			"",
-			"",
 		"#2023 REWRITE",
 			"PHOBOSLAB",
 			"DOMINIC SZABLEWSKI",
-			"",
-			"",
 		"#DEVELOPMENT SECRETARY",
 			"JENNIFER REES",
-			"",
-			"",
 		"#QUALITY ASSURANCE",
 			"STUART ALLEN",
 			"CHRIS GRAHAM",
@@ -317,8 +297,6 @@ const game_def_t def = {
 			"ANTHONY CROSS",
 			"EDWARD HAY",
 			"ROB WOLFE",
-			"",
-			"",
 		"#SPECIAL THANKS TO",
 			"THE HACKERS TEAM MGM",
 			"SOFTIMAGE",
@@ -540,6 +518,7 @@ static void *global_mem_mark = 0;
 
 void game_init(void) {
 	uint32_t size;
+
 	save_t *save_file = (save_t *)platform_load_userdata("save.dat", &size);
 	if (save_file) {
 		if (size == sizeof(save_t) && save_file->magic == SAVE_DATA_MAGIC)
@@ -566,7 +545,6 @@ void game_init(void) {
 	global_mem_mark = mem_mark();
 
 	sfx_music_mode(SFX_MUSIC_PAUSED);
-	sfx_music_play(rand_int(0, len(def.music)));
 
 	// System binds; always fixed
 	// Keyboard
@@ -628,6 +606,7 @@ void game_set_scene(game_scene_t scene) {
 		// FIXME: use a text based format?
 		// FIXME: this should probably run async somewhere
 		save.is_dirty = false;
+
 		platform_store_userdata("save.dat", &save, sizeof(save_t));
 	}
 	sfx_reset();

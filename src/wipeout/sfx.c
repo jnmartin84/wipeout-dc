@@ -70,7 +70,7 @@ void sfx_load(void) {
 	song_attr.create_detached = 1;
 	song_attr.stack_size = 32768;
 	song_attr.stack_ptr = NULL;
-	song_attr.prio = 9;
+	song_attr.prio = 11;
 	song_attr.label = "SONG_WORKER";	
 	thd_create_ex(&song_attr, song_worker, NULL);
 
@@ -128,11 +128,6 @@ void sfx_load(void) {
 }
 
 void sfx_reset(void) {
-	if (save.sfx_volume == 0.0f && unpause_sfx_volume > 0.0f) {
-		save.sfx_volume = unpause_sfx_volume;
-		unpause_sfx_volume = 0.0f;
-	}
-
 	for (int i = 0; i < SFX_MAX; i++) {
 		if (flags_is(nodes[i].flags, SFX_LOOP)) {
 			snd_sfx_stop(nodes[i].chn);
@@ -142,6 +137,11 @@ void sfx_reset(void) {
 			nodes[i].data.chn = nodes[i].chn;
 			flags_set(nodes[i].flags, SFX_NONE);
 		}
+	}
+
+	if (save.sfx_volume == 0.0f && unpause_sfx_volume > 0.0f) {
+		save.sfx_volume = unpause_sfx_volume;
+		unpause_sfx_volume = 0.0f;
 	}
 }
 
@@ -347,6 +347,10 @@ void sfx_music_play(uint32_t index) {
 	mutex_unlock(&song_mtx);
 }
 
+void sfx_music_pause(void) {
+	wav_volume(0);
+}
+
 #include <errno.h>
 
 void *song_worker(void *arg) {
@@ -393,6 +397,9 @@ void *song_worker(void *arg) {
 			// so clear this flag to indicate to the next iteration of the loop
 			// to not wait again
 			song_interrupted = 1;
+			if (music_mode == SFX_MUSIC_SCENECHANGE) {
+				music_mode = SFX_MUSIC_RANDOM;
+			}
 		}
 
 		thd_pass();		

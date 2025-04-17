@@ -19,6 +19,7 @@ void title_init(void) {
 	LOAD_UNFILTERED = 0;
 	start_time = system_time();
 	sfx_music_mode(SFX_MUSIC_RANDOM);
+	sfx_music_play(rand_int(0, len(def.music)));
 }
 
 void title_update(void) {
@@ -29,12 +30,13 @@ void title_update(void) {
 	if (input_pressed(A_MENU_SELECT) || input_pressed(A_MENU_START)) {
 		sfx_play(SFX_MENU_SELECT);
 		game_set_scene(GAME_SCENE_MAIN_MENU);
+	} else {
 	}
 
 	float duration = system_time() - start_time;
 	if (
-		(has_shown_attract && duration > 5) ||
-		(duration > 10)
+		(has_shown_attract && duration > 7) ||
+		(duration > 30)
 	) {
 		sfx_music_mode(SFX_MUSIC_RANDOM);
 		has_shown_attract = true;
@@ -43,6 +45,7 @@ void title_update(void) {
 		g.circut = rand_int(0, NUM_NON_BONUS_CIRCUTS);
 		g.race_class = rand_int(0, NUM_RACE_CLASSES);
 		g.race_type = RACE_TYPE_SINGLE;
+		sfx_music_pause();
 		game_set_scene(GAME_SCENE_RACE);
 	}
 }

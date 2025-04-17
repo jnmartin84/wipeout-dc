@@ -18,45 +18,6 @@ char *get_vmu_fn(maple_device_t *vmudev, char *fn) {
 	return full_fn;
 }
 
-int vmu_check(void)
-{
-	maple_device_t *vmudev = NULL;
-
-	ControllerPakStatus = 0;
-
-	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
-	if (!vmudev) {
-		dbgio_printf("vmu_check: could not enum\n");
-		return -1;
-	}
-
-	file_t d;
-	dirent_t *de;
-
-	d = fs_open(get_vmu_fn(vmudev, NULL), O_RDONLY | O_DIR);
-	if(!d) {
-		dbgio_printf("vmu_check: could not fs_open %s\n", get_vmu_fn(vmudev, NULL));
-		return -2;
-	}
-
-	Pak_Memory = 200;
-
-	while (NULL != (de = fs_readdir(d))) {
-		if (strcmp(de->name, ".") == 0)
-			continue;
-		if (strcmp(de->name, "..") == 0)
-			continue;
-
-		Pak_Memory -= (de->size / 512);
-	}
-
-	fs_close(d);
-
-	ControllerPakStatus = 1;
-
-	return 0;
-}
-
 #include "owl.h"
 
 // do all of the swapping needed to draw with vmu_draw_lcd

@@ -404,7 +404,7 @@ static void page_options_video_init(menu_t *menu, int index) {
 // -----------------------------------------------------------------------------
 // Options Audio
 
-extern void wav_volume(int volume);
+extern void __attribute__((noinline)) wav_volume(int volume);
 
 static void toggle_music_volume(menu_t *menu, int data) {
 	save.music_volume = (float)data * 0.1;
@@ -713,6 +713,7 @@ static void button_pilot_select(menu_t *menu, int data) {
 	else {
 		in_menu = 0;
 		g.circut = 0;
+		sfx_music_pause();
 		game_reset_championship();
 		game_set_scene(GAME_SCENE_RACE);
 	}
@@ -742,10 +743,11 @@ static void page_pilot_init(menu_t *menu) {
 
 // -----------------------------------------------------------------------------
 // Circut
-extern void wav_volume(int vol);
+
 static void button_circut_select(menu_t *menu, int data) {
 	in_menu = 0;
 	g.circut = data;
+	sfx_music_pause();
 	game_set_scene(GAME_SCENE_RACE);
 }
 
@@ -857,6 +859,10 @@ void main_menu_init(void) {
 
 	menu_reset(main_menu);
 	page_main_init(main_menu);
+
+	// don't play music until everything is loaded from disc
+	sfx_music_mode(SFX_MUSIC_RANDOM);
+	sfx_music_play(rand_int(0, len(def.music)));
 }
 
 extern pvr_dr_state_t dr_state;

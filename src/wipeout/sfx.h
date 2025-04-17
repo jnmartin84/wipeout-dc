@@ -78,7 +78,8 @@ typedef enum {
 	SFX_MUSIC_PAUSED,
 	SFX_MUSIC_RANDOM,
 	SFX_MUSIC_SEQUENTIAL,
-	SFX_MUSIC_LOOP
+	SFX_MUSIC_LOOP,
+	SFX_MUSIC_SCENECHANGE
 } sfx_music_mode_t;
 
 void sfx_music_next(void);

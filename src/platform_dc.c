@@ -170,8 +170,6 @@ extern int32_t Pak_Memory;
 extern const unsigned short vmu_icon_pal[16];
 extern const uint8_t icon1_data[512*3];
 
-extern void wav_volume(int vol);
-
 uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 	ssize_t size;
 	maple_device_t *vmudev = NULL;
@@ -289,7 +287,6 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 	if (!d) {
 		if (Pak_Memory < USERDATA_BLOCK_COUNT){
 			dbgio_printf("platform_store_userdata: no wipeout file and not enough space\n");
-			wav_volume(224 * save.music_volume);
 			return 0;
 		}
 		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDWR | O_CREAT);

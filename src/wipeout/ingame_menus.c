@@ -52,6 +52,7 @@ static void button_restart_or_quit(menu_t *menu, int data) {
 	}
 	else {
 		in_race = 0;
+		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
 }
@@ -63,6 +64,7 @@ static void button_restart(menu_t *menu, int data) {
 static void button_quit_confirm(menu_t *menu, int data) {
 	if (data) {
 		in_race = 0;
+		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
 	else {
@@ -129,6 +131,7 @@ static void button_qualify_confirm(menu_t *menu, int data) {
 	}
 	else {
 		in_race = 0;
+		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
 }
@@ -521,9 +524,9 @@ static void text_scroll_menu_draw(menu_t *menu, int data) {
 		const char *line = text_scroll_lines[i];
 
 		if (line[0] == '#') {
-			pos.y += 48 * scale;
-			ui_draw_text_centered(line + 1, pos, UI_SIZE_16, UI_COLOR_ACCENT);
-			pos.y += 32 * scale;
+			pos.y += 24 * scale;
+			ui_draw_text_centered(line + 1, pos, UI_SIZE_8, UI_COLOR_ACCENT);
+			pos.y += 12 * scale;
 		}
 		else {
 			ui_draw_text_centered(line, pos, UI_SIZE_8, UI_COLOR_DEFAULT);	

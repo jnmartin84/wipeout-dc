@@ -291,7 +291,7 @@ void hud_draw(ship_t *ship) {
 	if (g.race_type == RACE_TYPE_CHAMPIONSHIP) {
 		for (int i = 0; i < g.lives; i++) {
 			if (platform_screen_size().y == 360) {
-				ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -40)), UI_COLOR_DEFAULT);	
+				ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -45)), UI_COLOR_DEFAULT);
 			} else {
 				ui_draw_icon(UI_ICON_STAR, ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-26 - 13 * i, -50)), UI_COLOR_DEFAULT);
 			}

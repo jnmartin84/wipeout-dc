@@ -322,7 +322,7 @@ void track_load_sections(char *file_name) {
 			}
 		} else if (g.circut == CIRCUT_TERRAMAX) {
 			if (i >= 0 && i <= 32) {
-				ts->drawdist = DEFAULT_LOW_DISTSQ;
+				ts->drawdist = DEFAULT_MED_DISTSQ;
 			} else if (i == 318) {
 				ts->drawdist = DEFAULT_LOW_DISTSQ;
 			} else {
@@ -432,6 +432,10 @@ void track_load_sections(char *file_name) {
 			} else if (i >= 380 && i <= 386) {
 				ts->scenedist = DEFAULT_HIGH_DISTSQ;
 			}
+		}
+
+		if (g.is_attract_mode) {
+			ts->drawdist = ts->scenedist = DEFAULT_LOW_DISTSQ;
 		}
 
 		ts->base_face = NULL;

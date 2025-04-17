@@ -30,7 +30,6 @@
 #include "wipeout/game.h"
 
 #include <kos.h>
-
 #include "alloc.h"
 
 pvr_init_params_t pvr_params = {
@@ -44,7 +43,11 @@ pvr_init_params_t pvr_params = {
 };
 
 void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
+#if RENDER_USE_FSAA
+static float shakex = 640.0f;
+#else
 static float shakex = 320.0f;
+#endif
 static float shakey = 240.0f;
 
 #define NEAR_PLANE 16.0f
@@ -392,9 +395,8 @@ static uint32_t color_lerp(float ft, uint32_t c1, uint32_t c2) {
 static void nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, float w0, float w1) {
 	const float d0 = w0 + v0->z;
 	const float d1 = w1 + v1->z;
-	float d1subd0 = d1 - d0;
-	if (d1subd0 == 0.0f) d1subd0 = 0.0001f;
-	float t = (fabsf(d0) * approx_recip(d1subd0)) + 0.000001f;
+	const float d1subd0 = d1 - d0;
+	const float t = (fabsf(d0) * approx_recip(d1subd0));
 	outv->x = cliplerp(v0->x, v1->x, t);
 	outv->y = cliplerp(v0->y, v1->y, t);
 	outv->z = cliplerp(v0->z, v1->z, t);
@@ -412,12 +414,20 @@ void SetShake(float duration) {
 
 void ShakeScreen(void) {
 	if(shakeCount > 0.0f) {
+#if RENDER_USE_FSAA
+		shakex = 640.0f + ((-(rand_float(0.0f, shakeCount)) + (shakeCount * 0.5f))*90.0f);
+#else
 		shakex = 320.0f + ((-(rand_float(0.0f, shakeCount)) + (shakeCount * 0.5f))*45.0f);
+#endif
 		shakey = 240.0f + ((-(rand_float(0.0f, shakeCount)) + (shakeCount * 0.5f))*45.0f);
 		shakeCount -= system_tick();
 	}
 	else {
+#if RENDER_USE_FSAA
+		shakex = 640.0f; 
+#else
 		shakex = 320.0f; 
+#endif
 		shakey = 240.0f;
 		shakeCount = 0.0f;
 	}
@@ -467,7 +477,6 @@ void render_hud_quad(uint16_t texture_index) {
 
 void render_quad(uint16_t texture_index) {
 	float w0,w1,w2,w3,w4;
-	uint8_t cl0, cl1, cl2, cl3;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
 	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
@@ -475,6 +484,7 @@ void render_quad(uint16_t texture_index) {
 	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
 	mat_trans_single3_nodivw(vs[3].x, vs[3].y, vs[3].z, w3);
 
+	uint8_t cl0, cl1, cl2, cl3;
     cl0 = !(vs[0].z >  w0);
     cl0 = (cl0 << 1) | !(vs[0].z < -w0);
     cl0 = (cl0 << 1) | !(vs[0].y >  w0);
@@ -507,7 +517,6 @@ void render_quad(uint16_t texture_index) {
 		return;
 
 	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2) | (((vs[3].z >= -w3)) << 3));
-	//vs[2].flags = PVR_CMD_VERTEX;
 	int sendverts = 4;
 
 	if (vismask == 15) {
@@ -760,13 +769,13 @@ extern int shields_active;
 
 void render_tri(uint16_t texture_index) {
 	float w0,w1,w2,w3;
-	uint8_t cl0, cl1, cl2;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
 	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
 	mat_trans_single3_nodivw(vs[1].x, vs[1].y, vs[1].z, w1);
 	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
 
+	uint8_t cl0, cl1, cl2;
     cl0 = !(vs[0].z >  w0);
     cl0 = (cl0 << 1) | !(vs[0].z < -w0);
     cl0 = (cl0 << 1) | !(vs[0].y >  w0);
@@ -793,7 +802,6 @@ void render_tri(uint16_t texture_index) {
 
 	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2));
 	int sendverts = 3;
-//	vs[2].flags = PVR_CMD_VERTEX_EOL;
 
 	if (vismask == 7) {
 		goto tri_sendit;
@@ -889,7 +897,6 @@ tri_sendit:
 
 void render_quad_noxform(uint16_t texture_index, float *w) {
 	float w0,w1,w2,w3,w4;
-  	uint8_t cl0, cl1, cl2, cl3;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
 	w0 = w[0];
@@ -897,6 +904,7 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 	w2 = w[2];
 	w3 = w[3];
 
+  	uint8_t cl0, cl1, cl2, cl3;
     cl0 = !(vs[0].z >  w0);
     cl0 = (cl0 << 1) | !(vs[0].z < -w0);
     cl0 = (cl0 << 1) | !(vs[0].y >  w0);
@@ -929,10 +937,6 @@ void render_quad_noxform(uint16_t texture_index, float *w) {
 		return;
 
 	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2) | (((vs[3].z >= -w3)) << 3));
-
-//	vs[2].flags = PVR_CMD_VERTEX;
-//	vs[3].flags = PVR_CMD_VERTEX_EOL;
-
 	int sendverts = 4;
 
 	if (vismask == 15) {
@@ -1207,10 +1211,9 @@ void render_tri_noxform(uint16_t texture_index, float *w) {
 
 	if ((cl0 | cl1 | cl2) != 0x3f)
 		return;
- 
+
 	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2));
 	int sendverts = 3;
-//	vs[2].flags = PVR_CMD_VERTEX_EOL;
 
 	if (vismask == 7) {
 		goto tri_sendit;
@@ -1307,7 +1310,6 @@ tri_sendit:
 
 void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 	float w0,w1,w2,w3;
-  	uint8_t cl0, cl1, cl2, cl3;
 
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
@@ -1316,6 +1318,7 @@ void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 	w2 = w[2];
 	w3 = w[3];
 
+  	uint8_t cl0, cl1, cl2, cl3;
     cl0 = !(vs[0].z >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y < -w0);
@@ -1342,9 +1345,6 @@ void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 
     if ((cl0 | cl1 | cl2 | cl3) != 0x1f)
 		return;
- 
-//	vs[2].flags = PVR_CMD_VERTEX;
-//	vs[3].flags = PVR_CMD_VERTEX_EOL;
 
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
@@ -1414,13 +1414,13 @@ void render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 
 void render_tri_noxform_noclip(uint16_t texture_index, float *w) {
 	float w0,w1,w2;
- 	uint8_t cl0, cl1, cl2;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
 	w0 = w[0];
 	w1 = w[1];
 	w2 = w[2];
 
+ 	uint8_t cl0, cl1, cl2;
     cl0 = !(vs[0].z >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y >  w0);
     cl0 = (cl0 << 1) | !(vs[0].y < -w0);
@@ -1442,15 +1442,11 @@ void render_tri_noxform_noclip(uint16_t texture_index, float *w) {
     if ((cl0 | cl1 | cl2) != 0x1f)
 		return;
 
-//	vs[2].flags = PVR_CMD_VERTEX_EOL;
-
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
-	//render_set_blend_mode(RENDER_BLEND_NORMAL);
-
 	if (last_index != texture_index || cur_mode != last_mode[texture_index]) {
 		last_index = texture_index;
 
@@ -1521,7 +1517,6 @@ void render_push_2d(vec2i_t pos, vec2i_t size, rgba_t color, uint16_t texture_in
 }
 
 void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_t size, rgba_t color, uint16_t texture_index) {
-//	error_if(texture_index >= textures_len, "Invalid texture %d", texture_index);
 	vec2i_t tsize = render_texture_padsize(texture_index);
 	float rpw = approx_recip((float)tsize.x);
 	float rph = approx_recip((float)tsize.y);

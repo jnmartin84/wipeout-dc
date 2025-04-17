@@ -27,10 +27,9 @@ int in_race = 0;
 
 static bool is_paused = false;
 static bool menu_is_scroll_text = false;
-static bool has_show_credits = false;
 static float attract_start_time;
 static menu_t *active_menu = NULL;
-
+extern volatile uint32_t music_track_index;
 void race_init(void) {
 	ingame_menus_load();
 	menu_is_scroll_text = false;
@@ -43,29 +42,35 @@ void race_init(void) {
 		scene_init_aurora_borealis();	
 	} 
 
+	if (g.is_attract_mode) {
+		g.pilot = rand_int(0, len(def.pilots));
+	}
 	race_start();
 
 	if (g.is_attract_mode) {
 		attract_start_time = system_time();
-		for (int i = 0; i < len(g.ships); i++) {
-			// FIXME: this is needed to initializes the engine sound. Should 
-			// maybe be done in a separate step?
-			ship_ai_update_intro(&g.ships[i]); 
 
-			g.ships[i].update_func = ship_ai_update_race;
+		for (int i = 0; i < len(g.ships); i++) {
 			flags_rm(g.ships[i].flags, SHIP_VIEW_INTERNAL);
 			flags_rm(g.ships[i].flags, SHIP_RACING);
 		}
-		g.pilot = rand_int(0, len(def.pilots));
+
 		g.camera.update_func = camera_update_attract_random;
-		if (!has_show_credits || rand_int(0, 10) == 0) {
+		if ((rand_int(0, 257) % 3) == 0) {
 			active_menu = text_scroll_menu_init(def.credits, len(def.credits));
 			menu_is_scroll_text = true;
-			has_show_credits = true;
 		}
 	}
 
 	is_paused = false;
+	uint32_t last_index = music_track_index;
+	music_track_index = rand_int(0, len(def.music));
+	// never repeat a song in random
+	while (music_track_index == last_index) {
+		music_track_index = rand_int(0, len(def.music));
+	}
+	sfx_music_mode(SFX_MUSIC_SCENECHANGE);
+	sfx_music_play(music_track_index);
 }
 
 extern int sprites_to_draw;
@@ -95,11 +100,17 @@ void race_update(void) {
 		if (g.is_attract_mode) {
 			if (input_pressed(A_MENU_START) || input_pressed(A_MENU_SELECT)) {
 				in_race = 0;
+				sfx_music_pause();
 				game_set_scene(GAME_SCENE_MAIN_MENU);
 			}
 			float duration = system_time() - attract_start_time;
-			if ((!active_menu && duration > 30) || duration > 120) {
+			float credwait = 85;
+			if (ui_get_scale() == 1)
+				credwait = 90;
+
+			if ((!active_menu && duration > 35) || duration > credwait) {
 				in_race = 0;
+				sfx_music_pause();
 				game_set_scene(GAME_SCENE_TITLE);
 			}
 		}
@@ -130,6 +141,10 @@ void race_update(void) {
 
 	// Draw 2d
 	render_set_view_2d();
+
+	if (g.is_attract_mode && !active_menu) {
+		ui_draw_text("DEMO MODE", ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-56, 24)), UI_SIZE_8, UI_COLOR_ACCENT);
+	}
 
 	if (flags_is(g.ships[g.pilot].flags, SHIP_RACING)) {
 		hud_draw(&g.ships[g.pilot]);

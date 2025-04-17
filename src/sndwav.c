@@ -90,7 +90,7 @@ int __attribute__((noinline)) wav_init(void)
 	audio_attr.create_detached = 0;
 	audio_attr.stack_size = 32768;
 	audio_attr.stack_ptr = NULL;
-	audio_attr.prio = PRIO_DEFAULT;
+	audio_attr.prio = 11;
 	audio_attr.label = "MusicPlayer";
 
 	audio_thread = thd_create_ex(&audio_attr, sndwav_thread, NULL);
@@ -182,7 +182,7 @@ wav_stream_hnd_t __attribute__((noinline)) wav_create(const char *filename, int 
 	wav_get_info_adpcm(file, &info);
 
 	float samps = (float)info.data_length;
-	float runtime = ceilf(samps/44100.0f);
+	float runtime = floorf(samps/44100.0f);
 	*duration = (int)runtime;
 
 	if (!stream.drv_buf) {

@@ -188,7 +188,7 @@ uint32_t argb_from_u32(uint32_t v) {
 
 	factor = _v;
 			
-	l_flt = (float)factor * 2.0f;//1.75f;
+	l_flt = (float)factor * 2.0f;
 
 	_v = (int)l_flt;
 
@@ -240,6 +240,7 @@ vec3_t vector_transform(vector_t a) {
 }
 
 vec3_t vec3_transform(vec3_t a, mat4_t *mat) {
+#if 1
 	float w = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], a.x, a.y, a.z, 1);
 
 	float recipw = approx_recip(w);
@@ -251,6 +252,18 @@ vec3_t vec3_transform(vec3_t a, mat4_t *mat) {
 	float rz = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], a.x, a.y, a.z, 1);
 	rz *= recipw;
 	return vec3(rx,ry,rz);
+#else
+	float w = mat->m[3] * a.x + mat->m[7] * a.y + mat->m[11] * a.z + mat->m[15];
+	if (w == 0) {
+		w = 1;
+	}
+	float recipw = approx_recip(w);
+	return vec3(
+		(mat->m[0] * a.x + mat->m[4] * a.y + mat->m[ 8] * a.z + mat->m[12]) *recipw,
+		(mat->m[1] * a.x + mat->m[5] * a.y + mat->m[ 9] * a.z + mat->m[13]) *recipw,
+		(mat->m[2] * a.x + mat->m[6] * a.y + mat->m[10] * a.z + mat->m[14]) *recipw
+	);
+#endif
 }
 
 vec3_t vec3_project_to_ray(vec3_t p, vec3_t r0, vec3_t r1) {
@@ -315,8 +328,15 @@ void mat4_set_roll_pitch_yaw(mat4_t *mat, vec3_t rot) {
 }
 
 void mat4_translate(mat4_t *mat, vec3_t translation) {
+#if 1
 	mat->m[12] = fipr(mat->m[0], mat->m[4], mat->m[8], mat->m[12], translation.x, translation.y, translation.z, 1);
 	mat->m[13] = fipr(mat->m[1], mat->m[5], mat->m[9], mat->m[13], translation.x, translation.y, translation.z, 1);
 	mat->m[14] = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], translation.x, translation.y, translation.z, 1);
 	mat->m[15] = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], translation.x, translation.y, translation.z, 1);
+#else
+	mat->m[12] = mat->m[0] * translation.x + mat->m[4] * translation.y + mat->m[8] * translation.z + mat->m[12];
+	mat->m[13] = mat->m[1] * translation.x + mat->m[5] * translation.y + mat->m[9] * translation.z + mat->m[13];
+	mat->m[14] = mat->m[2] * translation.x + mat->m[6] * translation.y + mat->m[10] * translation.z + mat->m[14];
+	mat->m[15] = mat->m[3] * translation.x + mat->m[7] * translation.y + mat->m[11] * translation.z + mat->m[15];
+#endif	
 }
