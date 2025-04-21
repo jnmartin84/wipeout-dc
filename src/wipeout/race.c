@@ -291,6 +291,7 @@ void race_next(void) {
 	// Next track
 	else {
 		g.circut = next_circut;
+		sfx_music_pause();
 		game_set_scene(GAME_SCENE_RACE);
 	}
 }

@@ -285,14 +285,13 @@ void sfx_update_ex(sfx_t *sfx) {
 	else
 		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
-	sfx->data.freq = sfx->pitch * 22050;
+	sfx->data.freq = sfx->pitch * 44100;
 
 	// SORRY, KOS main doesn't have this yet
 	snd_sfx_update_ex(&sfx->data);
 }
 
 void sfx_set_position(sfx_t *sfx, vec3_t pos, vec3_t vel, float volume) {
-
 	vec3_t relative_position = vec3_sub(g.camera.position, pos);
 	vec3_t relative_velocity = vec3_sub(g.camera.real_velocity, vel);
 	float distance = vec3_len(relative_position);
@@ -309,7 +308,7 @@ void sfx_set_position(sfx_t *sfx, vec3_t pos, vec3_t vel, float volume) {
 	else
 		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
-	sfx->data.freq = sfx->pitch * 22050;
+	sfx->data.freq = sfx->pitch * 44100;
 
 	// SORRY, KOS main doesn't have this yet
 	snd_sfx_update_ex(&sfx->data);
@@ -327,7 +326,7 @@ void sfx_music_mode(sfx_music_mode_t mode) {
 }
 
 int sfx_music_open(char *path) {
-    int duration;
+	int duration = 0;
 	char *newpath = strcat(strcpy(temp_path, path_assets), path);
 
 	cur_hnd = wav_create(newpath, 1, &duration);

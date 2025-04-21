@@ -587,7 +587,8 @@ void track_draw(camera_t *camera) {
 	// track draw dist for player ship current section
 	float drawdist = g.track.sections[g.ships[g.pilot].section_num].drawdist;
 
-	for(int32_t i = 0; i < g.track.section_count; i++) {
+	// iterate backwards, fixes some of the depth order/draw issues with transparent track surfaces
+	for(int32_t i = g.track.section_count-1; i >= 0; i--) {
 		section_t *s = &g.track.sections[i];
 		vec3_t diff = vec3_sub(cam_pos, s->center);
 		float cam_dot = vec3_dot(diff, cam_dir);

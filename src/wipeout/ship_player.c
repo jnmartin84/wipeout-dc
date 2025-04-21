@@ -28,11 +28,12 @@
 void sfx_update_ex(sfx_t *sfx);
 extern void SetShake(float shake);
 void ship_player_update_sfx(ship_t *self) {
+#if 0
 	float speedf = self->speed * 0.0000152587890625f;//0.000015f;
-	self->sfx_engine_intake->volume = clamp(speedf * 8.0f, 0.0f, 1.0f);
+	self->sfx_engine_intake->volume = clamp(speedf * 4.0f, 0.0f, 1.0f);
 	self->sfx_engine_intake->pitch = 0.5f + speedf * 1.25f;
 
-	self->sfx_engine_thrust->volume = clamp(0.05f + 0.025f * (self->thrust_mag / self->thrust_max) * 15.0f/* * 2.0 */, 0.0f, 1.0f);
+	self->sfx_engine_thrust->volume = clamp(0.05f + 0.025f * (self->thrust_mag / self->thrust_max) * 8.0f/* * 2.0 */, 0.0f, 1.0f);
 	self->sfx_engine_thrust->pitch = 0.2f + 0.5f * (self->thrust_mag / self->thrust_max) + speedf;
 
 	float brake_left = self->brake_left * 0.0035f;
@@ -41,6 +42,25 @@ void ship_player_update_sfx(ship_t *self) {
 	self->sfx_turbulence->pan = (brake_right - brake_left);
 
 	self->sfx_shield->volume = flags_is(self->flags, SHIP_SHIELDED) ? 1.0f : 0.0f;
+
+	sfx_update_ex(self->sfx_engine_intake);
+	sfx_update_ex(self->sfx_engine_thrust);
+	sfx_update_ex(self->sfx_turbulence);
+	sfx_update_ex(self->sfx_shield);
+#endif	
+	float speedf = self->speed * 0.000015f;
+	self->sfx_engine_intake->volume = clamp(speedf * 1.5f, 0.0f, 1.0f);
+	self->sfx_engine_intake->pitch = 0.5f + speedf * 1.25f;
+
+	self->sfx_engine_thrust->volume = clamp((0.05f + 0.025f * (self->thrust_mag / self->thrust_max)) * 1.5f, 0.0f, 1.0f);
+	self->sfx_engine_thrust->pitch = 0.2f + 0.5f * (self->thrust_mag / self->thrust_max) + speedf;
+
+	float brake_left = self->brake_left * 0.0035f;
+	float brake_right = self->brake_right * 0.0035f;
+	self->sfx_turbulence->volume = clamp((speedf * brake_left + speedf * brake_right) * 1.5f, 0.0f, 1.0f);
+	self->sfx_turbulence->pan = (brake_right - brake_left);
+
+	self->sfx_shield->volume = flags_is(self->flags, SHIP_SHIELDED) ? 0.75f : 0.0f;
 
 	sfx_update_ex(self->sfx_engine_intake);
 	sfx_update_ex(self->sfx_engine_thrust);
