@@ -3,7 +3,7 @@
 # Wipeout-Rewrite port for Dreamcast
 
 ***
-Here's the second release. Extended draw distance, 16:9 anamorphic widescreen available, reimplemented screen shake, many bug-fixes for collision behavior, sound, target lockon indicator, more. Feature complete, 100% 60 FPS, music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
+Here's the second bug-fix release for v2. Extended draw distance, 16:9 anamorphic widescreen available, reimplemented screen shake, many bug-fixes for collision behavior, sound, target lockon indicator, more. Feature complete, 100% 60 FPS, music and sound, VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
 
 ## Download the disc image:
@@ -12,7 +12,7 @@ Here's the second release. Extended draw distance, 16:9 anamorphic widescreen av
 
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI` file and case art courtesy of `StiffPeaks`.
 
-https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.0
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.2
 
 ***
 
@@ -33,9 +33,9 @@ These may be changed in the controls menu.
 ***
 
 ##### Available video menu options
-`Display` - `4:3` / `16:9 anamorphic`; standard aspect ratio or "stretched" 16:9 for modern displays
+`Display` - `4:3` / `16:9 anamorphic`; standard aspect ratio or 16:9 for modern displays
 
-`Texture Filtering` - `on` for bilinear filtering, `off` for point sampling. Must begin a new race to take effect. No negative performance impact.
+`Texture Filtering` - `on` for bilinear filtering, `off` for point sampling.
 
 ***
 
