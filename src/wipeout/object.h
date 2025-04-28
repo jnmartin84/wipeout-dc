@@ -10,6 +10,7 @@
 
 typedef struct Primitive {
 	int16_t type; // Type of Primitive
+	int16_t flag;
 } Primitive;
 
 
@@ -334,13 +335,21 @@ typedef struct InfiniteLight {
 #define PRM_TYPE_POINT_LIGHT       22
 #define PRM_TYPE_SPOT_LIGHT        23
 
+typedef enum {
+	OBJNAME_START,
+	OBJNAME_REDL,
+	OBJNAME_DONKEY,
+	OBJNAME_LOSTAD,
+	OBJNAME_STAD_,
+	OBJNAME_NEWSTAD_,
+	OBJNAME_ERROR
+} object_name;
+
 
 typedef struct Object {
-	char name[16];
-
 	mat4_t *mat;
 	int16_t vertices_len; // Number of Vertices
-	/* vec3_t */vector_t *vertices; // Pointer to 3D Points
+	vector_t *vertices; // Pointer to 3D Points
 
 	int16_t normals_len; // Number of Normals
 	vec3_t *normals; // Pointer to 3D Normals
@@ -349,17 +358,13 @@ typedef struct Object {
 	Primitive *primitives; // Pointer to Z Sort Primitives
 
 	vec3_t origin;
-	int32_t extent; // Flags for object characteristics
+	int32_t extent;	// I hijacked this for a name enum
+			// was: Flags for object characteristics
 	int16_t flags; // Next object in list
 	float radius;
 	struct Object *next; // Next object in list
 
-	vector_t *xform;
-
-#if 0
-	vec3_t *xform;
-	float *w;
-#endif
+	vector_t *xform; // storage for transformed object verts
 }  Object;
 
 typedef union Prm {

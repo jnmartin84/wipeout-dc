@@ -42,24 +42,23 @@ static struct {
 	bool enabled;
 	GT4	*primitives[80];
 	int16_t *coords[80];
-	int16_t grey_coords[80];	
+	int16_t grey_coords[80];
 } aurora_borealis;
 
 void scene_pulsate_red_light(Object *obj);
 void scene_move_oil_pump(Object *obj);
 void scene_update_aurora_borealis(void);
 
-int load_OP = 0;
-
+extern global_render_state_t render_state;
 pvr_poly_hdr_t sky_hdr;
 
 void scene_load(const char *base_path, float sky_y_offset) {
 	texture_list_t scene_textures = image_get_compressed_textures(get_path(base_path, "scene.cmp"));
 	scene_objects = objects_load(get_path(base_path, "scene.prm"), scene_textures);
 
-	load_OP = 1;	
+	render_state.load_OP = 1;
 	texture_list_t sky_textures = image_get_compressed_textures(get_path(base_path, "sky.cmp"));
-	load_OP = 0;
+	render_state.load_OP = 0;
 	sky_object = objects_load(get_path(base_path, "sky.prm") , sky_textures);
 	sky_offset = vec3(0, sky_y_offset, 0);
 
@@ -73,23 +72,19 @@ void scene_load(const char *base_path, float sky_y_offset) {
 	while (obj) {
 		mat4_set_translation(obj->mat, obj->origin);
 
-		if (str_starts_with(obj->name, "start")) {
+		if (obj->extent == OBJNAME_START) {
 			error_if(start_booms_len >= SCENE_START_BOOMS_MAX, "SCENE_START_BOOMS_MAX reached");
 			start_booms[start_booms_len++] = obj;
 		}
-		else if (str_starts_with(obj->name, "redl")) {
+		else if (obj->extent == OBJNAME_REDL) {
 			error_if(red_lights_len >= SCENE_RED_LIGHTS_MAX, "SCENE_RED_LIGHTS_MAX reached");
 			red_lights[red_lights_len++] = obj;
 		}
-		else if (str_starts_with(obj->name, "donkey")) {
+		else if (obj->extent == OBJNAME_DONKEY) {
 			error_if(oil_pumps_len >= SCENE_OIL_PUMPS_MAX, "SCENE_OIL_PUMPS_MAX reached");
 			oil_pumps[oil_pumps_len++] = obj;
 		}
-		else if (
-			str_starts_with(obj->name, "lostad") || 
-			str_starts_with(obj->name, "stad_") ||
-			str_starts_with(obj->name, "newstad_")
-		) {
+		else if (obj->extent == OBJNAME_LOSTAD || obj->extent == OBJNAME_STAD_ || obj->extent == OBJNAME_NEWSTAD_) {
 			error_if(stands_len >= SCENE_STANDS_MAX, "SCENE_STANDS_MAX reached");
 			stands[stands_len++] = (scene_stand_t){.sfx = NULL, .pos = obj->origin};
 		}
@@ -113,6 +108,7 @@ void scene_update(void) {
 	for (int i = 0; i < oil_pumps_len; i++) {
 		scene_move_oil_pump(oil_pumps[i]);
 	}
+
 	for (int i = 0; i < stands_len; i++) {
 		sfx_set_position(stands[i].sfx, stands[i].pos, vec3(0, 0, 0), 0.4);
 	}
@@ -122,8 +118,9 @@ void scene_update(void) {
 	}
 }
 
-extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+extern pvr_vertex_t vs[5];
 extern pvr_dr_state_t dr_state;
+
 void scene_draw(camera_t *camera) {
 	// Sky
 	render_set_depth_write(false);
@@ -151,7 +148,7 @@ void scene_draw(camera_t *camera) {
 		float cam_dot = vec3_dot(diff, cam_dir);
 		float dist_sq = vec3_dot(diff, diff);
 		if (
-			cam_dot < object->radius && 
+			cam_dot < object->radius &&
 			dist_sq < drawdist
 		) {
 			object_draw(object, object->mat);
@@ -162,8 +159,7 @@ void scene_draw(camera_t *camera) {
 }
 
 void scene_set_start_booms(int light_index) {
-	
-	int lights_len = 1;
+int lights_len = 1;
 //	rgba_t color = rgba(0, 0, 0, 0);
 	uint32_t color = 0x00000000;
 
