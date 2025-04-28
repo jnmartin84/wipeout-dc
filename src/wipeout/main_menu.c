@@ -25,8 +25,6 @@ static void page_options_audio_init(menu_t *menu);
 static void page_options_highscores_init(menu_t *menu);
 static void page_options_bonus_init(menu_t *menu);
 
-int in_menu = 0;
-
 static uint16_t background;
 static texture_list_t track_images;
 static menu_t *main_menu;
@@ -43,7 +41,7 @@ static struct {
 extern int test_en;
 extern int dep_en;
 
-extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+extern pvr_vertex_t vs[5];
 extern void memcpy32(const void *dst, const void *src, size_t s);
 
 #define DCPAD_NUM_FACES 3021
@@ -53,7 +51,7 @@ static mat4_t __attribute__((aligned(32))) mat;
 static void draw_controller(vec2_t offset, vec3_t pos, float rotation) {
 	render_set_view(vec3(0,0,0), vec3(0, -F_PI, -F_PI));
 	render_set_screen_position(offset);
-	
+
 	memset(&mat.cols, 0, 64);
 	mat.cols[0][0] = mat.cols[1][1] = mat.cols[2][2] = mat.cols[3][3] = 1.0f;
 
@@ -72,7 +70,7 @@ static void draw_controller(vec2_t offset, vec3_t pos, float rotation) {
 		else
 			render_quad(RENDER_NO_TEXTURE);
 	}
-	
+
 	render_set_cull_backface(true);
 
 	render_set_screen_position(vec2(0, 0));
@@ -112,7 +110,6 @@ static void page_main_draw(menu_t *menu, int data) {
 }
 
 static void page_main_init(menu_t *menu) {
-	
 	menu_page_t *page = menu_push(menu, "OPTIONS", page_main_draw);
 	flags_add(page->layout_flags, MENU_FIXED);
 	if (platform_screen_size().y == 360) {
@@ -156,7 +153,7 @@ static void button_bonus(menu_t *menu, int data) {
 
 static void page_options_draw(menu_t *menu, int data) {
 	switch (data) {
-		case 0: draw_controller(vec2(0, -0.1), vec3(0, 0, -250), system_cycle_time()); break; 		//draw_model(models.controller, vec2(0, -0.1), vec3(0, 0, -6000), system_cycle_time()); break;
+		case 0: draw_controller(vec2(0, -0.1), vec3(0, 0, -250), system_cycle_time()); break;
 		case 1: draw_model(models.rescue, vec2(0, -0.2), vec3(0, 0, -700), system_cycle_time()); break; // TODO: needs better model
 		case 2: draw_model(models.options.headphones, vec2(0, -0.2), vec3(0, 0, -300), system_cycle_time()); break;
 		case 3: draw_model(models.options.stopwatch, vec2(0, -0.2), vec3(0, 0, -400), system_cycle_time()); break;
@@ -243,7 +240,7 @@ static void page_options_controls_set_init(menu_t *menu, int data) {
 	menu_page_t *page = menu_push(menu, "AWAITING INPUT", page_options_control_set_draw);
 	// compiler hush
 	(void)page;
-	if_to_await = 1;	
+	if_to_await = 1;
 	input_capture(button_capture, menu);
 }
 
@@ -260,7 +257,7 @@ static void page_options_control_draw(menu_t *menu, int data) {
 
 	for (int action = 0; action < NUM_GAME_ACTIONS; action++) {
 		rgba_t text_color = UI_COLOR_DEFAULT;
-		if (action == data) {
+		if (action == page->index) {
 			text_color = UI_COLOR_ACCENT;
 		}
 
@@ -276,11 +273,18 @@ static void page_options_control_draw(menu_t *menu, int data) {
 	}
 }
 
+static void toggle_analog_response(menu_t *menu, int data) {
+	save.analog_response = (float)data + 1;
+	save.is_dirty = true;
+}
+
+static const char *analog_response[] = {"LINEAR", "MODERATE", "HEAVY"};
+
 static void page_options_controls_init(menu_t *menu) {
 	menu_page_t *page = menu_push(menu, "CONTROLS", page_options_control_draw);
 	flags_set(page->layout_flags, MENU_VERTICAL | MENU_FIXED);
 	if (platform_screen_size().y == 360) {
-		page->title_pos = vec2i(-160, -75);	
+		page->title_pos = vec2i(-160, -75);
 		page->items_pos = vec2i(-160, -37);
 	} else {
 		page->title_pos = vec2i(-160, -100);
@@ -299,6 +303,8 @@ static void page_options_controls_init(menu_t *menu) {
 	menu_page_add_button(page, A_THRUST, "THRUST", page_options_controls_set_init);
 	menu_page_add_button(page, A_FIRE, "FIRE", page_options_controls_set_init);
 	menu_page_add_button(page, A_CHANGE_VIEW, "VIEW", page_options_controls_set_init);
+
+	menu_page_add_toggle(page, save.analog_response - 1, "ANALOG RESPONSE", analog_response, len(analog_response), toggle_analog_response);
 }
 
 static void toggle_rapier(menu_t *menu, int data) {
@@ -328,7 +334,7 @@ static void page_options_bonus_init(menu_t *menu) {
 		page->title_pos = vec2i(-160, -100);
 		page->items_pos = vec2i(-160, -60);
 	}
-	
+
 	page->title_anchor = UI_POS_MIDDLE | UI_POS_CENTER;
 	page->block_width = 320;
 	page->items_anchor = UI_POS_MIDDLE | UI_POS_CENTER;
@@ -413,7 +419,7 @@ static void toggle_music_volume(menu_t *menu, int data) {
 }
 
 static void toggle_sfx_volume(menu_t *menu, int data) {
-	save.sfx_volume = (float)data * 0.1;	
+	save.sfx_volume = (float)data * 0.1;
 	save.is_dirty = true;
 }
 
@@ -494,7 +500,7 @@ static void page_options_highscores_viewer_draw(menu_t *menu, int data) {
 		ui_draw_text_centered(def.race_classes[options_highscores_race_class].name, ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_DEFAULT);
 		pos.y += 16;
 		ui_draw_text_centered(def.circuts[options_highscores_circut].name, ui_scaled_pos(anchor, pos), UI_SIZE_8, UI_COLOR_ACCENT);
-		
+
 		vec2i_t entry_pos = vec2i(pos.x - 110, pos.y + 16);
 		highscores_t *hs = &save.highscores[options_highscores_race_class][options_highscores_circut][options_highscores_tab];
 		for (int i = 0; i < NUM_HIGHSCORES; i++) {
@@ -513,7 +519,7 @@ static void page_options_highscores_viewer_draw(menu_t *menu, int data) {
 		ui_draw_text_centered(def.race_classes[options_highscores_race_class].name, ui_scaled_pos(anchor, pos), UI_SIZE_12, UI_COLOR_DEFAULT);
 		pos.y += 16;
 		ui_draw_text_centered(def.circuts[options_highscores_circut].name, ui_scaled_pos(anchor, pos), UI_SIZE_12, UI_COLOR_ACCENT);
-		
+
 		vec2i_t entry_pos = vec2i(pos.x - 110, pos.y + 24);
 		highscores_t *hs = &save.highscores[options_highscores_race_class][options_highscores_circut][options_highscores_tab];
 		for (int i = 0; i < NUM_HIGHSCORES; i++) {
@@ -711,7 +717,7 @@ static void button_pilot_select(menu_t *menu, int data) {
 		page_circut_init(menu);
 	}
 	else {
-		in_menu = 0;
+		render_state.in_menu = 0;
 		g.circut = 0;
 		sfx_music_pause();
 		game_reset_championship();
@@ -745,7 +751,7 @@ static void page_pilot_init(menu_t *menu) {
 // Circut
 
 static void button_circut_select(menu_t *menu, int data) {
-	in_menu = 0;
+	render_state.in_menu = 0;
 	g.circut = data;
 	sfx_music_pause();
 	game_set_scene(GAME_SCENE_RACE);
@@ -763,12 +769,18 @@ static void page_circut_draw(menu_t *menu, int data) {
 		if (ui_get_scale() == 2) {
 			scaled_size.x = 160;
 			scaled_size.y = 93;
-		}
-		else {
-			scaled_size = size;
+		} else {
+			//scaled_size = size;
+			scaled_size.x = 320;
+			scaled_size.y = 186;
 		}
 	} else {
-		scaled_size = ui_scaled(size);
+		if (ui_get_scale() == 2) {
+			scaled_size = ui_scaled(size);
+		} else {
+			scaled_size.x = 320;
+			scaled_size.y = 186;
+		}
 	}
 
 	vec2i_t scaled_pos;
@@ -777,12 +789,16 @@ static void page_circut_draw(menu_t *menu, int data) {
 			scaled_pos.x = (320 - 80);
 			scaled_pos.y = (80);
 		} else {
-			scaled_pos = ui_scaled_pos(UI_POS_MIDDLE | UI_POS_CENTER, vec2i(pos.x - scaled_size.x/2, pos.y - scaled_size.y/2));		
+			scaled_pos = ui_scaled_pos(UI_POS_MIDDLE | UI_POS_CENTER, vec2i(pos.x - scaled_size.x/2, pos.y - scaled_size.y/2));
 		}
 	} else {
-		scaled_pos = ui_scaled_pos(UI_POS_MIDDLE | UI_POS_CENTER, vec2i(pos.x - size.x/2, pos.y - size.y/2));
+		if (ui_get_scale() == 2) {
+			scaled_pos = ui_scaled_pos(UI_POS_MIDDLE | UI_POS_CENTER, vec2i(pos.x - size.x/2, pos.y - size.y/2));
+		} else {
+			scaled_pos = ui_scaled_pos(UI_POS_MIDDLE | UI_POS_CENTER, vec2i(pos.x - scaled_size.x/2, pos.y - scaled_size.y/2));
+		}
 	}
-	render_push_2d(scaled_pos, scaled_size, rgba(128, 128, 128, 255), texture_from_list(track_images, data));
+	render_push_2d(scaled_pos, scaled_size, rgba(255,255,255,255), texture_from_list(track_images, data));
 }
 
 static void page_circut_init(menu_t *menu) {
@@ -816,35 +832,34 @@ static void objects_unpack_imp(Object **dest_array, int len, Object *src) {
 	error_if(i != len, "expected %d models got %d", len, i)
 }
 
-extern int load_OP;
-extern int LOAD_UNFILTERED;
+extern global_render_state_t render_state;
 
 void main_menu_init(void) {
-	in_menu = 1;
+	render_state.in_menu = 1;
 	g.is_attract_mode = false;
 	ships_reset_exhaust_plumes();
 
 	main_menu = mem_bump(sizeof(menu_t));
 
-	load_OP = 1;
+	render_state.load_OP = 1;
 	background = image_get_texture("wipeout/textures/wipeout1.tim");
-	load_OP = 0;
+	render_state.load_OP = 0;
 	track_images = image_get_compressed_textures("wipeout/textures/track.cmp");
 
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	objects_unpack(models.race_classes, objects_load("wipeout/common/leeg.prm", image_get_compressed_textures("wipeout/common/leeg.cmp")));
 	objects_unpack(models.teams, objects_load("wipeout/common/teams.prm", texture_list_empty()));
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 
 	objects_unpack(models.pilots, objects_load("wipeout/common/pilot.prm", image_get_compressed_textures("wipeout/common/pilot.cmp")));
 
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	objects_unpack(models.options, objects_load("wipeout/common/alopt.prm", image_get_compressed_textures("wipeout/common/alopt.cmp")));
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 
 	objects_unpack(models.rescue, objects_load("wipeout/common/rescu.prm", image_get_compressed_textures("wipeout/common/rescu.cmp")));
 
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	// ugly hack but hey it gets it loaded up
 	uint32_t dcpad_size;
 	void *objdata = platform_load_asset("wipeout/common/dcpad.bin", &dcpad_size);
@@ -853,9 +868,9 @@ void main_menu_init(void) {
 	model_faces = (pvr_vertex_t *)(((uintptr_t)mfptr + 31) & ~31);
 	memcpy(model_faces, objdata, DCPAD_NUM_FACES * sizeof(pvr_vertex_t) * 4);
 	mem_temp_free(objdata);
-	
+
 	objects_unpack(models.misc, objects_load("wipeout/common/msdos.prm", image_get_compressed_textures("wipeout/common/msdos.cmp")));
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 
 	menu_reset(main_menu);
 	page_main_init(main_menu);
@@ -870,7 +885,7 @@ extern pvr_dr_state_t dr_state;
 void main_menu_update(void) {
 	render_set_view_2d();
 	render_set_depth_write(false);
-	render_push_2d(vec2i(0, 0), render_size(), rgba(128, 128, 128, 255), background);
+	render_push_2d(vec2i(0, 0), render_size(), rgba(255,255,255,255), background);
 	render_set_depth_write(true);
 
 	pvr_list_finish();
