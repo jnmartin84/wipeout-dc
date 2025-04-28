@@ -323,17 +323,20 @@ void weapon_update_mine_wait_for_release(weapon_t *self) {
 }
 
 #define packcol(rr,gg,bb) (0xff000000 | ((rr) << 16) | ((gg) << 8) | (bb))
+
 void weapon_update_mine_lights(weapon_t *self, int index) {
 	Prm prm = {.primitive = self->model->primitives};
 
-	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * 64 + 191;
+	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * 64 + 64;
 	for (int i = 0; i < 8; i++) {
 		switch (prm.primitive->type) {
-		// TODO - reintroduce ability to either do blending or specular coloring on triangles
 		case PRM_TYPE_GT3:
-			prm.gt3->color[0] = packcol(255,0,0);
-			prm.gt3->color[1] = packcol(r,0x60,0);
+			prm.gt3->color[0] = packcol(255, 0, 0);
+			// slight color adjustment over original, smaller green contribution
+			prm.gt3->color[1] = packcol(r, 0x30, 0);
 			prm.gt3->color[2] = prm.gt3->color[1];
+			// used to indicate to `object_draw` that offset color should be set
+			prm.gt3->pad1 = 1000;
 			prm.gt3 += 1;
 			break;
 		}
@@ -362,7 +365,7 @@ void weapon_update_mine(weapon_t *self) {
 				ship->speed = ship->speed * 0.125;
 			}
 		}
-	}	
+	}
 }
 
 
@@ -585,8 +588,8 @@ void weapon_update_shield(weapon_t *self) {
 
 
 void weapon_fire_turbo(ship_t *ship) {
-	ship->velocity = vec3_add(ship->velocity, vec3_mulf(ship->dir_forward, 39321)); // unitVecNose.vx) << 3) * FR60) / 50
-	
+	ship->velocity = vec3_add(ship->velocity, vec3_mulf(ship->dir_forward, 32768.0f)); // unitVecNose.vx) << 3)
+
 	if (ship->pilot == g.pilot) {
 		sfx_t *sfx = sfx_play(SFX_MISSILE_FIRE);
 		sfx->pitch = 0.25;
