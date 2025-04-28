@@ -195,6 +195,7 @@ const game_def_t def = {
 			"JNMARTIN84",
 			"MRNEO240",
 		"#THIRD PARTY CODE",
+			"SKMP",
 			"KAZADE",
 			"FALCO GIRGIS",
 			"BBHOODSTA",
@@ -405,8 +406,8 @@ save_t save = {
 	.magic = SAVE_DATA_MAGIC,
 	.is_dirty = true,
 
-	.sfx_volume = 0.8,
-	.music_volume = 0.4,
+	.sfx_volume = 0.5,
+	.music_volume = 0.5,
 	.internal_roll = 0.6,
 	.ui_scale = 0,
 	.render_dist = 8,
@@ -432,6 +433,8 @@ save_t save = {
 		[A_FIRE] = {INPUT_GAMEPAD_X, INPUT_INVALID},
 		[A_CHANGE_VIEW] = {INPUT_GAMEPAD_Y, INPUT_INVALID},
 	},
+
+	.analog_response = 2, // Exponent for stick turn input
 
 	.highscores_name = {0,0,0,0},
 	.highscores = {
@@ -500,7 +503,6 @@ save_t save = {
 
 game_t g = {0};
 
-extern int in_menu;
 struct {
 	void (*init)(void);
 	void (*update)(void);
@@ -650,7 +652,7 @@ void game_update(void) {
 	g.frame_time = now - frame_start_time;
 
 	if (g.frame_time > 0) {
-		g.frame_rate = 1.0f / g.frame_time ;
+		g.frame_rate = 1.0f / g.frame_time;
 	}
 }
 
