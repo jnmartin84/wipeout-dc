@@ -10,13 +10,13 @@ static particle_t *particles;
 static int particles_active = 0;
 static texture_list_t particle_textures;
 
-extern int LOAD_UNFILTERED;
+extern global_render_state_t render_state;
 
 void particles_load(void) {
 	particles = mem_bump(sizeof(particle_t) * PARTICLES_MAX);
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	particle_textures = image_get_compressed_textures("wipeout/common/effects.cmp");
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 	particles_init();
 }
 
@@ -63,7 +63,7 @@ void particles_spawn(vec3_t position, uint16_t type, vec3_t velocity, int size) 
 	}
 
 	particle_t *p = &particles[particles_active++];
-	p->color = 0x80808080;//rgba(128, 128, 128, 128);
+	p->color = 0x80FFFFFF;
 	p->texture = texture_from_list(particle_textures, type);
 	p->position = position;
 	p->velocity = velocity;
