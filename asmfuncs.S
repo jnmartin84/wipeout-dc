@@ -1,22 +1,16 @@
-! KallistiOS ##version##
-!
-! kernel/libc/koslib/memcpy.s
-!
-! Copyright (C) 2025 Falco Girgis
-!
-! Optimized assembly code for specialized memcpy()-like routines.
-
+! semblies
 .text
-
     .align 5
 .globl _xform_all_verts
     .type _xform_all_verts, @function
 _xform_all_verts:
 !int xform_all_verts(vector_t *output, vector_t *input, int c) {
+! arguments:
 ! r4 = & output[0]
 ! r5 = & input [0]
 ! r6 = count
-! r7 = wtest (1 for all in front of near-z, 0 otherwise)
+! returns:
+! r0 = wtest (1 for all in front of near-z, 0 otherwise)
 
 	! pref first input
 ! 0
@@ -282,6 +276,14 @@ _xform_all_verts:
         .size    _xform_all_verts,.xform_all_verts_end - _xform_all_verts
 
 
+! KallistiOS ##version##
+!
+! kernel/libc/koslib/memcpy.s
+!
+! Copyright (C) 2025 Falco Girgis
+!
+! Optimized assembly code for specialized memcpy()-like routines.
+
 !
 ! void *memcpy32(void *restrict dst, const void *restrict src, size_t bytes)
 !
@@ -345,6 +347,7 @@ _memcpy32:
         .size    _memcpy32,.memcpy32_end - _memcpy32
 
 
+! thanks @FalcoGirgis
     .align 5
 .globl _fast_mat_apply
     .type _fast_mat_apply, @function

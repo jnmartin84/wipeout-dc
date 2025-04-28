@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#define MEM_TEMP_OBJECTS_MAX (8+128)
+#define MEM_TEMP_OBJECTS_MAX (8+1024)
 #define MEM_HUNK_BYTES (6 * 1024 * 1024)
 
 void *mem_bump(uint32_t size);

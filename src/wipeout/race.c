@@ -23,8 +23,6 @@
 
 #define ATTRACT_DURATION 60.0
 
-int in_race = 0;
-
 static bool is_paused = false;
 static bool menu_is_scroll_text = false;
 static float attract_start_time;
@@ -37,10 +35,10 @@ void race_init(void) {
 	const circut_settings_t *cs = &def.circuts[g.circut].settings[g.race_class];
 	track_load(cs->path);
 	scene_load(cs->path, cs->sky_y_offset);
-	
+
 	if (g.circut == CIRCUT_SILVERSTREAM && g.race_class == RACE_CLASS_RAPIER) {
-		scene_init_aurora_borealis();	
-	} 
+		scene_init_aurora_borealis();
+	}
 
 	if (g.is_attract_mode) {
 		g.pilot = rand_int(0, len(def.pilots));
@@ -99,7 +97,7 @@ void race_update(void) {
 
 		if (g.is_attract_mode) {
 			if (input_pressed(A_MENU_START) || input_pressed(A_MENU_SELECT)) {
-				in_race = 0;
+				render_state.in_race = 0;
 				sfx_music_pause();
 				game_set_scene(GAME_SCENE_MAIN_MENU);
 			}
@@ -109,7 +107,7 @@ void race_update(void) {
 				credwait = 90;
 
 			if ((!active_menu && duration > 35) || duration > credwait) {
-				in_race = 0;
+				render_state.in_race = 0;
 				sfx_music_pause();
 				game_set_scene(GAME_SCENE_TITLE);
 			}
@@ -122,19 +120,21 @@ void race_update(void) {
 	// Draw 3D
 	render_set_view(g.camera.position, g.camera.angle);
 
+	scene_draw(&g.camera);
+
 	render_set_cull_backface(false);
-	scene_draw(&g.camera);	
 	track_draw(&g.camera);
 	render_set_cull_backface(true);
 
 	ships_draw();
 	droid_draw(&g.droid);
+
 	weapons_draw();
 	particles_draw();
 
 	// deferred trees and other things
-	if (sprites_to_draw) {
-		render_set_depth_write(false);		
+ 	if (sprites_to_draw) {
+		render_set_depth_write(false);
 		draw_all_sprites();
 		render_set_depth_write(true);
 	}
@@ -160,7 +160,7 @@ void race_update(void) {
 }
 
 void race_start(void) {
-	in_race = 1;
+	render_state.in_race = 1;
 	active_menu = NULL;
 	sfx_reset();
 	scene_init();

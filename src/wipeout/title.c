@@ -11,12 +11,12 @@ static uint16_t title_image;
 static float start_time;
 static bool has_shown_attract = false;
 
-extern int LOAD_UNFILTERED;
+extern global_render_state_t render_state;
 
 void title_init(void) {
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	title_image = image_get_texture("wipeout/textures/wiptitle.tim");
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 	start_time = system_time();
 	sfx_music_mode(SFX_MUSIC_RANDOM);
 	sfx_music_play(rand_int(0, len(def.music)));
@@ -24,7 +24,7 @@ void title_init(void) {
 
 void title_update(void) {
 	render_set_view_2d();
-	render_push_2d(vec2i(0, 0), render_size(), rgba(128, 128, 128, 255), title_image);
+	render_push_2d(vec2i(0, 0), render_size(), rgba(255,255,255,255), title_image);
 	ui_draw_text_centered("PRESS START", ui_scaled_pos(UI_POS_BOTTOM | UI_POS_CENTER, vec2i(0, -40)), UI_SIZE_8, UI_COLOR_DEFAULT);
 
 	if (input_pressed(A_MENU_SELECT) || input_pressed(A_MENU_START)) {

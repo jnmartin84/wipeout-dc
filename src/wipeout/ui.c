@@ -53,12 +53,16 @@ char_set_t char_set[UI_SIZE_MAX] = {
 	},
 };
 
+
 uint16_t icon_textures[UI_ICON_MAX];
-extern int LOAD_UNFILTERED;
+
+extern global_render_state_t render_state;
+
 void ui_load(void) {
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	texture_list_t tl = image_get_compressed_textures("wipeout/textures/drfonts.cmp");
-	
+	render_state.LOAD_UNFILTERED = 0;
+
 	char_set[UI_SIZE_16].texture   = texture_from_list(tl, 0);
 	char_set[UI_SIZE_12].texture   = texture_from_list(tl, 1);
 	char_set[UI_SIZE_8 ].texture   = texture_from_list(tl, 2);
@@ -68,7 +72,6 @@ void ui_load(void) {
 	icon_textures[UI_ICON_END]     = texture_from_list(tl, 7);
 	icon_textures[UI_ICON_DEL]     = texture_from_list(tl, 8);
 	icon_textures[UI_ICON_STAR]    = texture_from_list(tl, 9);
-	LOAD_UNFILTERED = 0;
 }
 
 int ui_get_scale(void) {

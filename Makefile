@@ -26,7 +26,7 @@ SRC_DIRS += src/wipeout
 C_FILES := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
 
 # Object files
-O_FILES := src/alloc.o src/input.o src/mem.o src/platform_dc.o src/render_dc.o src/system.o src/types_dc.o src/utils.o src/wipeout/camera.o src/wipeout/droid.o src/wipeout/game.o src/wipeout/hud.o src/wipeout/image.o src/wipeout/ingame_menus.o src/wipeout/intro.o src/wipeout/main_menu.o src/wipeout/menu.o src/wipeout/object.o src/wipeout/particle.o src/wipeout/race.o src/wipeout/scene.o src/wipeout/sfx.o src/wipeout/ship_ai.o src/wipeout/ship.o src/wipeout/ship_player.o src/wipeout/title.o src/wipeout/track.o src/wipeout/ui.o src/wipeout/weapon.o src/sndwav.o src/vmu.o asmfuncs.o src/matrix.o
+O_FILES := src/alloc.o src/input.o src/mem.o src/platform_dc.o src/render_dc.o src/system.o src/types_dc.o src/utils.o src/wipeout/camera.o src/wipeout/droid.o src/wipeout/game.o src/wipeout/hud.o src/wipeout/image.o src/wipeout/ingame_menus.o src/wipeout/intro.o src/wipeout/main_menu.o src/wipeout/menu.o src/wipeout/object.o src/wipeout/particle.o src/wipeout/race.o src/wipeout/scene.o src/wipeout/sfx.o src/wipeout/ship_ai.o src/wipeout/ship.o src/wipeout/ship_player.o src/wipeout/title.o src/wipeout/track.o src/wipeout/ui.o src/wipeout/weapon.o src/sndwav.o src/vmu.o asmfuncs.o
 
 # tools
 PRINT = printf
