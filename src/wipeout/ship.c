@@ -165,19 +165,19 @@ void ships_draw(void) {
 		if (i == g.pilot) {
 			draw_this |= (1 << i);
 		} else {
-			int distance = 20;
+#define VIS_TEST_DIST 20
+			int distance = VIS_TEST_DIST;
 			int sc = g.track.section_count;
-			if (g.ships[i].section->num == g.ships[g.pilot].section->num) {
-				distance = 0;
-			} else if ((g.ships[i].section->num > 0) && (g.ships[g.pilot].section->num > 0)) {
-				distance = abs(g.ships[i].section->num - g.ships[g.pilot].section->num);
-			} else if (g.ships[g.pilot].section->num == 0) {
-				distance = sc - g.ships[i].section->num;
-			} else if (g.ships[i].section->num == 0) {
-				distance = sc - g.ships[g.pilot].section->num;
-			}
 
-			if (distance < 20) {
+			int pilot_secnum = g.ships[g.pilot].section_num;
+			int other_secnum = g.ships[i].section_num;
+
+			if ((other_secnum - VIS_TEST_DIST) < 0) other_secnum = other_secnum + sc;
+			if ((pilot_secnum - VIS_TEST_DIST) < 0) pilot_secnum = pilot_secnum + sc;
+
+			distance = abs(other_secnum - pilot_secnum);
+
+			if (distance < VIS_TEST_DIST) {
 				draw_this |= (1 << i);
 			}			
 		}
@@ -326,18 +326,15 @@ void ship_init_exhaust_plume(ship_t *self) {
 				indices[indices_len++] = prm.ft3->coords[2];
 
 				flags_add(prm.ft3->flag, PRM_TRANSLUCENT);
-				// original color... pink?
+				// original color
 				//prm.ft3->color.r = 180;
 				//prm.ft3->color.g = 97 ;
 				//prm.ft3->color.b = 120;
 				//prm.ft3->color.a = 140;
 
-				// what I set it to
-				//prm.ft3->color.r = 255;
-				//prm.ft3->color.g = 160;
-				//prm.ft3->color.b = 0;
-				//prm.ft3->color.a = 140;
-				prm.ft3->color = 0x8CFFA000;
+				// what I set it to:
+				// clamped(original color * 2) with original alpha
+				prm.ft3->color = 0x8cffc2f0;
 				prm.ft3->pad1 = 1;
 			}
 			prm.ft3 += 1;
@@ -372,18 +369,15 @@ void ship_init_exhaust_plume(ship_t *self) {
 
 				flags_add(prm.gt3->flag, PRM_TRANSLUCENT);
 				for (int j = 0; j < 3; j++) {
-					// original color... pink?
+					// original color
 					//prm.gt3->color[j].r = 180;
 					//prm.gt3->color[j].g = 97 ;
 					//prm.gt3->color[j].b = 120;
 					//prm.gt3->color[j].a = 140;
 
-					// what I set it to
-					//prm.gt3->color[j].r = 255;
-					//prm.gt3->color[j].g = 160;
-					//prm.gt3->color[j].b = 0;
-					//prm.gt3->color[j].a = 140;
-					prm.gt3->color[j] = 0x8CFFA000;
+					// what I set it to:
+					// clamped(original color * 2) with original alpha
+					prm.gt3->color[j] = 0x8cffc2f0;
 				}
 				prm.gt3->pad1 = 1;
 			}
@@ -462,9 +456,9 @@ void ship_draw(ship_t *self, int psec) {
 }
 
 #include <kos.h>
-extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+extern pvr_vertex_t vs[5];
 
-void ship_draw_shadow(ship_t *self, int psec) {	
+void ship_draw_shadow(ship_t *self, int psec) {
 	if (!psec)
 		return;
 
@@ -478,7 +472,7 @@ void ship_draw_shadow(ship_t *self, int psec) {
 	nose = vec3_sub(nose, vec3_mulf(face->normal, 0.85 * vec3_distance_to_plane(nose, face_point, face->normal)));
 	wngl = vec3_sub(wngl, vec3_mulf(face->normal, 0.85 * vec3_distance_to_plane(wngl, face_point, face->normal)));
 	wngr = vec3_sub(wngr, vec3_mulf(face->normal, 0.85 * vec3_distance_to_plane(wngr, face_point, face->normal)));
-	
+
 	uint32_t lcol = 0x80000000;
 
 	vec2i_t tsize = render_texture_padsize(self->shadow_texture);
@@ -878,7 +872,7 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 		alpha = vec3_distance_to_plane(ship_wing_right(self), face_point, face->normal);
 		if (alpha <= 0) {
 			if (
-				flags_is(self->section->flags, SECTION_JUNCTION_START) || 
+				flags_is(self->section->flags, SECTION_JUNCTION_START) ||
 				flags_is(self->section->flags, SECTION_JUNCTION_END)
 			) {
 				collide = vec3_is_on_face(ship_wing_right(self), face, alpha);
@@ -939,7 +933,7 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 			}
 			return;
 		}
-		
+
 		alpha = vec3_distance_to_plane(ship_wing_left(self), face_point, face->normal);
 		if (alpha <= 0.0f) {
 			if (
@@ -976,10 +970,32 @@ void ship_collide_with_track(ship_t *self, track_face_t *face) {
 	}
 }
 
-
+// thanks @FalcoGirgis
+inline static void fast_mat_load(const matrix_t* mtx) {
+    asm volatile(
+        R"(
+            fschg
+            fmov.d    @%[mtx],xd0
+            add        #32,%[mtx]
+            pref    @%[mtx]
+            add        #-(32-8),%[mtx]
+            fmov.d    @%[mtx]+,xd2
+            fmov.d    @%[mtx]+,xd4
+            fmov.d    @%[mtx]+,xd6
+            fmov.d    @%[mtx]+,xd8
+            fmov.d    @%[mtx]+,xd10
+            fmov.d    @%[mtx]+,xd12
+            fmov.d    @%[mtx]+,xd14
+            fschg
+        )"
+        : [mtx] "+r" (mtx)
+        :
+        :
+    );
+}
 bool ship_intersects_ship(ship_t *self, ship_t *other) {
 	// Get 4 points of collision model relative to the camera
-	mat_load(&other->mat->cols);
+	fast_mat_load(&other->mat->cols);
 	vec3_t a = vector_transform(other->collision_model->vertices[0]);
 	vec3_t b = vector_transform(other->collision_model->vertices[1]);
 	vec3_t c = vector_transform(other->collision_model->vertices[2]);
@@ -999,7 +1015,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 	int primitives_len = other->collision_model->primitives_len;
 
 	vec3_t p1, p2, p3;
-	mat_load(&self->mat->cols);
+	fast_mat_load(&self->mat->cols);
 	// for all 4 planes of the enemy ship
 	for (int pi = 0; pi < primitives_len; pi++) {
 		int16_t *indices;
@@ -1048,7 +1064,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 			float dp2 = vec3_dot(other_lines[vi], plane1);
 
 			if (dp2 != 0) {
-				float norm = dp1 * copysignf(approx_recip(dp2),dp2); // / dp2;
+				float norm = dp1 * copysignf(approx_recip(dp2), dp2);
 
 				if ((norm >= 0) && (norm <= 1)) {
 					vec3_t term = vec3_mulf(other_lines[vi], norm);
@@ -1057,7 +1073,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 					vec3_t v0 = vec3_sub(p1, res);
 					vec3_t v1 = vec3_sub(p2, res);
 					vec3_t v2 = vec3_sub(p3, res);
-					
+
 					float angle =
 						vec3_angle(v0, v1) +
 						vec3_angle(v1, v2) +
@@ -1077,7 +1093,7 @@ bool ship_intersects_ship(ship_t *self, ship_t *other) {
 
 void ship_collide_with_ship(ship_t *self, ship_t *other) {
 	float distance = vec3_len(vec3_sub(self->position, other->position));
-	
+
 	// Do a quick distance check; if ships are far apart, remove the collision flag
 	// and early out.
 	if (distance > 960) {
@@ -1118,7 +1134,7 @@ void ship_collide_with_ship(ship_t *self, ship_t *other) {
 	other->position = vec3_add(other->position, vec3_mulf(other->velocity, 0.015625f)); // >> 6
 
 	if (
-		flags_not(self->flags, SHIP_COLL) && 
+		flags_not(self->flags, SHIP_COLL) &&
 		flags_not(other->flags, SHIP_COLL) &&
 		self->last_impact_time > 0.2f
 	) {
