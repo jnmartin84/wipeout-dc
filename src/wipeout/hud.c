@@ -53,17 +53,19 @@ const struct {
 
 static uint16_t speedo_facia_texture;
 
-int LOAD_UNFILTERED = 0;
+extern global_render_state_t render_state;
 
 void hud_load(void) {
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	speedo_facia_texture = image_get_texture("wipeout/textures/speedo.tim");
 	target_reticle = image_get_texture_semi_trans("wipeout/textures/target2.tim");
 	weapon_icon_textures = image_get_compressed_textures("wipeout/common/wicons.cmp");
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 }
+
 #include <kos.h>
-extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+extern pvr_vertex_t vs[5];
+
 static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speedo_bar_t *b, float f, rgba_t color_override) {
 	rgba_t left_color, right_color;
 	if (color_override.a > 0) {
@@ -80,6 +82,7 @@ static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speed
 		);
 	}
 
+
 	float right_h = lerp(a->height, b->height, f);
 	vec2i_t top_left     = vec2i(a->offset.x + 1, a->offset.y);
 	vec2i_t bottom_left  = vec2i(a->offset.x + 1 - a->height / speedo.skew, a->offset.y + a->height);
@@ -91,9 +94,12 @@ static void hud_draw_speedo_bar(vec2i_t *pos, const speedo_bar_t *a, const speed
 	top_right    = ui_scaled(top_right);
 	bottom_right = ui_scaled(bottom_right);
 
+	uint32_t rawlcol = (left_color.r << 24) | (left_color.g << 16) | (left_color.b << 8) | (left_color.a);
+	uint32_t rawrcol = (right_color.r << 24) | (right_color.g << 16) | (right_color.b << 8) | (right_color.a);
 	uint32_t lcol,rcol;
-	lcol = (left_color.a << 24) | (left_color.r << 16) | (left_color.g << 8) | left_color.b;
-	rcol = (right_color.a << 24) | (right_color.r << 16) | (right_color.g << 8) | right_color.b;
+
+	lcol = argb_from_u32_usealpha(rawlcol);
+	rcol = argb_from_u32_usealpha(rawrcol);
 
 	vs[0].flags = PVR_CMD_VERTEX;
 	vs[0].x = pos->x + bottom_left.x;
@@ -160,27 +166,95 @@ static void hud_draw_speedo_bars(vec2i_t *pos, float f, rgba_t color_override) {
 }
 
 static void hud_draw_speedo(int speed, int thrust) {
-	vec2i_t facia_pos;// = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
-	vec2i_t bar_pos;// = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
+	vec2i_t facia_pos;
+	vec2i_t bar_pos;
 	if (platform_screen_size().y == 360) {
 		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
 		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -35));
 	} else {
 		facia_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -45));
 		bar_pos = ui_scaled_pos(UI_POS_BOTTOM | UI_POS_RIGHT, vec2i(-141, -40));
-	}	//render_set_depth_write(false);
+	}
+
 	hud_draw_speedo_bars(&bar_pos, thrust / 65.0, rgba(255, 0, 0, 128));
 	hud_draw_speedo_bars(&bar_pos, speed / 2166.0, rgba(0, 0, 0, 0));
-	render_push_2d(facia_pos, ui_scaled(render_texture_size(speedo_facia_texture)), rgba(128, 128, 128, 255), speedo_facia_texture);
-	//render_set_depth_write(true);
+	render_push_2d(facia_pos, ui_scaled(render_texture_size(speedo_facia_texture)), rgba(255, 255, 255, 255), speedo_facia_texture);
 }
 
 extern mat4_t __attribute__((aligned(32))) view_mat;
-extern  mat4_t __attribute__((aligned(32))) mvp_mat;
-extern  mat4_t __attribute__((aligned(32))) vp_mat;
+extern mat4_t __attribute__((aligned(32))) mvp_mat;
+extern mat4_t __attribute__((aligned(32))) vp_mat;
 
-void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2);
+// thanks @FalcoGirgis
+inline static void mat_load_apply(const matrix_t* matrix1, const matrix_t* matrix2) {
+    unsigned int prefetch_scratch;
 
+    asm volatile (
+        "mov %[bmtrx], %[pref_scratch]\n\t"
+        "add #32, %[pref_scratch]\n\t"
+        "fschg\n\t"
+        "pref @%[pref_scratch]\n\t"
+        // back matrix
+        "fmov.d @%[bmtrx]+, XD0\n\t" 
+        "fmov.d @%[bmtrx]+, XD2\n\t"
+        "fmov.d @%[bmtrx]+, XD4\n\t"
+        "fmov.d @%[bmtrx]+, XD6\n\t"
+        "pref @%[fmtrx]\n\t"
+        "fmov.d @%[bmtrx]+, XD8\n\t" 
+        "fmov.d @%[bmtrx]+, XD10\n\t"
+        "fmov.d @%[bmtrx]+, XD12\n\t"
+        "mov %[fmtrx], %[pref_scratch]\n\t"
+        "add #32, %[pref_scratch]\n\t"
+        "fmov.d @%[bmtrx], XD14\n\t"
+        "pref @%[pref_scratch]\n\t"
+        // front matrix
+        // interleave loads and matrix multiply 4x4
+        "fmov.d @%[fmtrx]+, DR0\n\t"
+        "fmov.d @%[fmtrx]+, DR2\n\t"
+        "fmov.d @%[fmtrx]+, DR4\n\t"
+        "ftrv XMTRX, FV0\n\t"
+
+        "fmov.d @%[fmtrx]+, DR6\n\t"
+        "fmov.d @%[fmtrx]+, DR8\n\t"
+        "ftrv XMTRX, FV4\n\t"
+
+        "fmov.d @%[fmtrx]+, DR10\n\t"
+        "fmov.d @%[fmtrx]+, DR12\n\t"
+        "ftrv XMTRX, FV8\n\t"
+
+        "fmov.d @%[fmtrx], DR14\n\t"
+        "fschg\n\t"
+        "ftrv XMTRX, FV12\n\t"
+        "frchg\n"
+        : [bmtrx] "+&r" ((unsigned int)matrix1), [fmtrx] "+r" ((unsigned int)matrix2), [pref_scratch] "=&r" (prefetch_scratch)
+        : // no inputs
+        : "fr0", "fr1", "fr2", "fr3", "fr4", "fr5", "fr6", "fr7", "fr8", "fr9", "fr10", "fr11", "fr12", "fr13", "fr14", "fr15"
+    );
+}
+
+// thanks @FalcoGirgis
+inline static void fast_mat_load(const matrix_t* mtx) {
+    asm volatile(
+        R"(
+            fschg
+            fmov.d    @%[mtx],xd0
+            add        #32,%[mtx]
+            pref    @%[mtx]
+            add        #-(32-8),%[mtx]
+            fmov.d    @%[mtx]+,xd2
+            fmov.d    @%[mtx]+,xd4
+            fmov.d    @%[mtx]+,xd6
+            fmov.d    @%[mtx]+,xd8
+            fmov.d    @%[mtx]+,xd10
+            fmov.d    @%[mtx]+,xd12
+            fmov.d    @%[mtx]+,xd14
+            fschg
+        )"
+        : [mtx] "+r" (mtx)
+        :
+        :
+    );
+}
 static void hud_draw_target_icon(vec3_t position) {
 	vec2i_t screen_size = render_size();
 	vec2i_t size = ui_scaled(render_texture_size(target_reticle));
@@ -191,7 +265,7 @@ static void hud_draw_target_icon(vec3_t position) {
 	float rz = position.z;
 	mat_load_apply(&vp_mat.cols, &view_mat.cols);
 	mat_trans_single3(rx,ry,rz);
-	mat_load(&mvp_mat.cols);
+	fast_mat_load(&mvp_mat.cols);
 
 	projected.x = rx;
 	projected.y = ry;
@@ -211,7 +285,7 @@ static void hud_draw_target_icon(vec3_t position) {
 		((-projected.y + 1.0) / 2.0) * screen_size.y - size.y / 2
 	);
 
-	render_push_2d(pos, size, rgba(128, 128, 128, 128), target_reticle);
+	render_push_2d(pos, size, rgba(255, 255, 255, 128), target_reticle);
 }
 
 void hud_draw(ship_t *ship) {
@@ -273,8 +347,8 @@ void hud_draw(ship_t *ship) {
 
 	// Weapon icon
 	if (ship->weapon_type != WEAPON_TYPE_NONE) {
-		vec2i_t pos;// = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 20));
-		vec2i_t size;// = ui_scaled(vec2i(32, 32));
+		vec2i_t pos;
+		vec2i_t size;
 		if (platform_screen_size().y == 360) {
 			pos = ui_scaled_pos(UI_POS_TOP | UI_POS_CENTER, vec2i(-16, 15));
 			size = ui_scaled(vec2i(24, 24));
@@ -284,7 +358,7 @@ void hud_draw(ship_t *ship) {
 			size = ui_scaled(vec2i(32, 32));
 		}
 		uint16_t icon = texture_from_list(weapon_icon_textures, ship->weapon_type-1);
-		render_push_2d(pos, size, rgba(128,128,128,255), icon);
+		render_push_2d(pos, size, rgba(255,255,255,255), icon);
 	}
 
 	// Lives
