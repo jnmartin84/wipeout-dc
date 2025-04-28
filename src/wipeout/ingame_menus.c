@@ -13,7 +13,6 @@
 #include "ui.h"
 #include "race.h"
 
-extern int in_race;
 static void page_race_points_init(menu_t * menu);
 static void page_championship_points_init(menu_t * menu);
 static void page_hall_of_fame_init(menu_t * menu);
@@ -21,13 +20,13 @@ static void page_hall_of_fame_init(menu_t * menu);
 static texture_list_t pilot_portraits;
 static menu_t *ingame_menu;
 
-extern int LOAD_UNFILTERED;
+extern global_render_state_t render_state;
 
 void ingame_menus_load(void) {
-	LOAD_UNFILTERED = 1;
+	render_state.LOAD_UNFILTERED = 1;
 	pilot_portraits = image_get_compressed_textures(def.pilots[g.pilot].portrait);
 	ingame_menu = mem_bump(sizeof(menu_t));
-	LOAD_UNFILTERED = 0;
+	render_state.LOAD_UNFILTERED = 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -51,7 +50,7 @@ static void button_restart_or_quit(menu_t *menu, int data) {
 		race_restart();
 	}
 	else {
-		in_race = 0;
+		render_state.in_race = 0;
 		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
@@ -63,7 +62,7 @@ static void button_restart(menu_t *menu, int data) {
 
 static void button_quit_confirm(menu_t *menu, int data) {
 	if (data) {
-		in_race = 0;
+		render_state.in_race = 0;
 		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
@@ -130,7 +129,7 @@ static void button_qualify_confirm(menu_t *menu, int data) {
 		race_restart();
 	}
 	else {
-		in_race = 0;
+		render_state.in_race = 0;
 		sfx_music_pause();
 		game_set_scene(GAME_SCENE_MAIN_MENU);
 	}
