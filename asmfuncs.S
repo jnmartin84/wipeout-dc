@@ -7,10 +7,10 @@
 ! Optimized assembly code for specialized memcpy()-like routines.
 
 .text
-    .global _xform_all_verts
-    .globl _memcpy32
 
     .align 5
+.globl _xform_all_verts
+    .type _xform_all_verts, @function
 _xform_all_verts:
 !int xform_all_verts(vector_t *output, vector_t *input, int c) {
 ! r4 = & output[0]
@@ -19,65 +19,117 @@ _xform_all_verts:
 ! r7 = wtest (1 for all in front of near-z, 0 otherwise)
 
 	! pref first input
+! 0
 	pref	@r5
-
+! 2
 	fmov	fr12, @-r15
+! 4
     add     #16, r4
+! 6
 	fmov	fr13, @-r15
+! 8
     mov     #1, r0
+! 10
 	fmov	fr14, @-r15
-! used to flip T
-    mov #1,r1
+! 12
 	fmov	@r5+, fr0
+! 14
 	fmov	@r5+, fr1
+! 16
 	fmov	@r5+, fr2
+! 18
 	fldi1	fr3
+!20
 	add	#4, r5
+!22
 	dt	r6
+!24
 	pref	@r5
-
 
 	! first transform
+! 26
 	ftrv	xmtrx, fv0
+! 28
 	bt	.only1Vertex
+! 30
+	nop
 
+! 32
 	fmov	@r5+, fr4
+! 34
 	fmov	@r5+, fr5
+! 36
 	fmov	@r5+, fr6
+! 38
 	fldi1	fr7
+! 40
 	add	#4, r5
+!42
 	pref	@r5
-
+!44
 	dt	r6
+!46
 	ftrv	xmtrx, fv4
+! 48
 	bt	.loopEnd
+! 50
+	nop
+! 52
+	bra .loop
+! 54
+! 56
+! 58
+! 60
+! 62
+	nop
+	nop
+	nop
+	nop
+	nop
+! 64
 .loop:
 	pref	@r4
 
 	! Load a vector.
+! 68
 	fmov	@r5+, fr8
+! 70
 	fmov	@r5+, fr9
+!72
 	fmov	@r5+, fr10
+!74
 	fldi1	fr11
+!76
 	add	#4, r5
+!78
 	pref	@r5
-
+!80
 	! Store a vector.
 	ftrv	xmtrx, fv8
 
     ! w = fr3
+!82
 	fmov    fr3, @-r4
     ! z = fr2
+!84
 	fmov    fr2,@-r4
+!86
     fneg fr3
+!88
 	fmov	fr1, @-r4
+!90
     fcmp/gt fr3, fr2
+!92
 	fmov	fr0, @-r4
+!94
     movt r7
+!96
     add #32,r4
+!98
 	dt	r6
+!100
     and r7, r0
-
+! 102
 	bt/s        .firstInLoop
 	pref        @r4
 
@@ -226,6 +278,9 @@ _xform_all_verts:
     fmov        @r15+, fr13
     rts
     fmov        @r15+, fr12
+.xform_all_verts_end:
+        .size    _xform_all_verts,.xform_all_verts_end - _xform_all_verts
+
 
 !
 ! void *memcpy32(void *restrict dst, const void *restrict src, size_t bytes)
@@ -236,6 +291,8 @@ _xform_all_verts:
 !
 ! Function entry point + loop prolog
     .align 5
+.globl _memcpy32
+    .type _memcpy32, @function
 _memcpy32:
     mov     r4, r0              ! Return dst pointer     
     mov     #-5, r3
@@ -284,3 +341,53 @@ _memcpy32:
 .memcpy32_exit:
     rts                         
     fschg                       ! Swap back to float FMOVs
+.memcpy32_end:
+        .size    _memcpy32,.memcpy32_end - _memcpy32
+
+
+    .align 5
+.globl _fast_mat_apply
+    .type _fast_mat_apply, @function
+
+_fast_mat_apply:
+            mov        r15, r0
+            pref    @r4
+            or        #0x0f, r0
+            xor     #0x0f, r0
+            mov     r15, r7
+            fschg
+            mov     r0, r15
+    
+            fmov.d    dr14, @-r15
+            fmov.d    dr12, @-r15
+    
+            fmov.d    @r4, dr0
+            add        #32, r4
+            pref    @r4
+            add        #-(32-8), r4
+            fmov.d    @r4+, dr2
+            fmov.d    @r4+, dr4
+            fmov.d    @r4+, dr6
+
+            ftrv    xmtrx, fv0
+
+            fmov.d    @r4+, dr8
+            fmov.d    @r4+, dr10
+
+            ftrv    xmtrx, fv4
+
+            fmov.d    @r4+, dr12
+            fmov.d    @r4+, dr14
+    
+            ftrv    xmtrx, fv8
+            ftrv    xmtrx, fv12  
+
+            frchg
+            fmov.d    @r15+, dr12  
+            fmov.d    @r15, dr14
+
+            mov        r7, r15
+            rts
+            fschg
+.fast_mat_apply_end:
+        .size    _fast_mat_apply,.fast_mat_apply_end - _fast_mat_apply
