@@ -140,8 +140,8 @@ vec3_t *track_load_vertices(char *file_name) {
 }
 
 static const vec2_t track_uv[2][4] = {
-	{{128, 0}, {  0, 0}, {  0, 128}, {128, 128}},
-	{{  0, 0}, {128, 0}, {128, 128}, {  0, 128}}
+	{{1, 0}, {  0, 0}, {  0, 1}, {1, 1}},
+	{{  0, 0}, {1, 0}, {1, 1}, {  0, 1}}
 };
 
 void track_load_faces(char *file_name, vec3_t *vertices) {
@@ -155,10 +155,8 @@ void track_load_faces(char *file_name, vec3_t *vertices) {
 
 	uint32_t p = 0;
 	track_face_t *tf = g.track.faces;
-	uint16_t tstart = g.track.textures.start;
 
 	for (int i = 0; i < g.track.face_count; i++) {
-
 		vec3_t v0 = vertices[get_i16(bytes, &p)];
 		vec3_t v1 = vertices[get_i16(bytes, &p)];
 		vec3_t v2 = vertices[get_i16(bytes, &p)];
@@ -167,59 +165,60 @@ void track_load_faces(char *file_name, vec3_t *vertices) {
 		tf->normal.y = (float)get_i16(bytes, &p) / 4096.0f;
 		tf->normal.z = (float)get_i16(bytes, &p) / 4096.0f;
 
-		tf->texture = get_i8(bytes, &p);
+		tf->texture = get_u8(bytes, &p);
 		tf->flags = get_i8(bytes, &p);
-		vec2i_t tsize = render_texture_padsize(tstart + tf->texture);
-		float pw = (float)tsize.x;
-		float ph = (float)tsize.y;
 
 		uint32_t lcol = argb_from_u32(get_u32(bytes, &p));
 
 		const vec2_t *uv = track_uv[flags_is(tf->flags, FACE_FLIP_TEXTURE) ? 1 : 0];
 		pvr_vertex_t *tf_verts = &g.track.apvr[i<<2];
-		tf->vp = tf_verts;
+		tf->verts = tf_verts;
 
-		// these look redundant but they are used for collision
+		// "bottom right"
 		tf_verts[0] = (pvr_vertex_t){
 				.flags = PVR_CMD_VERTEX,
 				.x = v3.x,
 				.y = v3.y,
 				.z = v3.z,
-				.u = uv[3].x / pw,
-				.v = uv[3].y / ph,
+				.u = uv[3].x,
+				.v = uv[3].y,
 				.argb = lcol,
 				.oargb = 0,
 				};
+		// "bottom left"
 		tf_verts[1] = (pvr_vertex_t){.flags = PVR_CMD_VERTEX,
 				.x = v2.x,
 				.y = v2.y,
 				.z = v2.z,
-				.u = uv[2].x / pw,
-				.v = uv[2].y / ph,
+				.u = uv[2].x,
+				.v = uv[2].y,
 				.argb = lcol,
 				.oargb = 0,
 				};
+		// "top right"
 		tf_verts[2] = (pvr_vertex_t){
 				.flags = PVR_CMD_VERTEX,
 				.x = v0.x,
 				.y = v0.y,
 				.z = v0.z,
-				.u = uv[0].x / pw,
-				.v = uv[0].y / ph,
+				.u = uv[0].x,
+				.v = uv[0].y,
 				.argb = lcol,
 				.oargb = 0,
 				},
+		// "top left"
 		tf_verts[3] = (pvr_vertex_t){
 				.flags = PVR_CMD_VERTEX_EOL,
 				.x = v1.x,
 				.y = v1.y,
 				.z = v1.z,
-				.u = uv[1].x / pw,
-				.v = uv[1].y / ph,
+				.u = uv[1].x,
+				.v = uv[1].y,
 				.argb = lcol,
 				.oargb = 0,
 				},
 
+		// these look redundant but they are used for collision
 		tf->tris[0] = (tris_t){
 			.vertices = {
 				{//.pos = v0, .uv = uv[0], .color = color, .spec = 0
@@ -300,8 +299,6 @@ void track_load_sections(char *file_name) {
 	uint8_t *bytes = platform_load_asset(file_name, &size);
 
 	g.track.section_count = size / 156; // SECTION_DATA_SIZE
-	// if you need to know section count for anything
-	//printf("%d\n", g.track.section_count);
 	g.track.sections = mem_bump(sizeof(section_t) * g.track.section_count);
 
 	uint32_t p = 0;
@@ -388,15 +385,21 @@ void track_load_sections(char *file_name) {
 			// also right after stands at beginning
 			if (i >= 38 && i <= 118) {
 				ts->drawdist = DEFAULT_LOW_DISTSQ;
-				ts->scenedist = DEFAULT_XHIGH_DISTSQ;
+				ts->scenedist = DEFAULT_MED_DISTSQ;
 			} else if (i >= 490 && i <= 540) {
 				ts->drawdist = DEFAULT_LOW_DISTSQ;
-				ts->scenedist = DEFAULT_XHIGH_DISTSQ;
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
 			} else if (i >= 541 && i <= 585) {
 				ts->drawdist = DEFAULT_LOW_DISTSQ;
-				ts->scenedist = DEFAULT_LOW_DISTSQ;		
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
 			}
-		} else if (g.circut == CIRCUT_ARRIDOS_IV) {
+		} else if (g.circut == CIRCUT_KARBONIS_V) {
+			if (i >= 0 && i <= 125) {
+				ts->scenedist = DEFAULT_LOW_DISTSQ;
+			} else if (i >= 179 && i <= 219) {
+				ts->scenedist = DEFAULT_HIGH_DISTSQ;
+			}
+		}else if (g.circut == CIRCUT_ARRIDOS_IV) {
 			if (i >= 172 && i <= 179) {
 				ts->scenedist = DEFAULT_HIGH_DISTSQ;
 			} else if (i >= 181 && i <= 192) {
@@ -417,7 +420,7 @@ void track_load_sections(char *file_name) {
 				ts->scenedist = DEFAULT_MED_DISTSQ;
 			} else if (i == 0 || (i >= 335 && i <= 363)) {
 				ts->scenedist = DEFAULT_MED_DISTSQ;
-			} 
+			}
 		} else if (g.circut == CIRCUT_TERRAMAX) {
 			if (i >= 0 && i <= 32) {
 				ts->scenedist = DEFAULT_XXHIGH_DISTSQ;
@@ -436,6 +439,14 @@ void track_load_sections(char *file_name) {
 
 		if (g.is_attract_mode) {
 			ts->drawdist = ts->scenedist = DEFAULT_LOW_DISTSQ;
+		} else {
+			if (platform_screen_size().y == 360) {
+				ts->drawdist -= (0.15f * ts->drawdist);
+				ts->scenedist -= (0.15f * ts->scenedist);
+			} else {
+				ts->drawdist -= (0.07f * ts->drawdist);
+				ts->scenedist -= (0.07f * ts->scenedist);
+			}
 		}
 
 		ts->base_face = NULL;
@@ -483,34 +494,35 @@ void track_load_sections(char *file_name) {
 				ts->base_face = (track_face_t *)((uintptr_t)tfc - 0x100);
 			}
 
+// two different ways to compute a radius
 #if 1
-			v0.x = fabsf(tfc->vp[0].x - ts->center.x);
-			v0.y = fabsf(tfc->vp[0].y - ts->center.y);
-			v0.z = fabsf(tfc->vp[0].z - ts->center.z);
+			v0.x = fabsf(tfc->verts[0].x - ts->center.x);
+			v0.y = fabsf(tfc->verts[0].y - ts->center.y);
+			v0.z = fabsf(tfc->verts[0].z - ts->center.z);
 
 			if (v0.x > ts->radius) ts->radius = v0.x;
 			if (v0.y > ts->radius) ts->radius = v0.y;
 			if (v0.z > ts->radius) ts->radius = v0.z;
 
-			v1.x = fabsf(tfc->vp[1].x - ts->center.x);
-			v1.y = fabsf(tfc->vp[1].y - ts->center.y);
-			v1.z = fabsf(tfc->vp[1].z - ts->center.z);
+			v1.x = fabsf(tfc->verts[1].x - ts->center.x);
+			v1.y = fabsf(tfc->verts[1].y - ts->center.y);
+			v1.z = fabsf(tfc->verts[1].z - ts->center.z);
 
 			if (v1.x > ts->radius) ts->radius = v1.x;
 			if (v1.y > ts->radius) ts->radius = v1.y;
 			if (v1.z > ts->radius) ts->radius = v1.z;
 
-			v2.x = fabsf(tfc->vp[2].x - ts->center.x);
-			v2.y = fabsf(tfc->vp[2].y - ts->center.y);
-			v2.z = fabsf(tfc->vp[2].z - ts->center.z);
+			v2.x = fabsf(tfc->verts[2].x - ts->center.x);
+			v2.y = fabsf(tfc->verts[2].y - ts->center.y);
+			v2.z = fabsf(tfc->verts[2].z - ts->center.z);
 
 			if (v2.x > ts->radius) ts->radius = v2.x;
 			if (v2.y > ts->radius) ts->radius = v2.y;
 			if (v2.z > ts->radius) ts->radius = v2.z;
 
-			v3.x = fabsf(tfc->vp[3].x - ts->center.x);
-			v3.y = fabsf(tfc->vp[3].y - ts->center.y);
-			v3.z = fabsf(tfc->vp[3].z - ts->center.z);
+			v3.x = fabsf(tfc->verts[3].x - ts->center.x);
+			v3.y = fabsf(tfc->verts[3].y - ts->center.y);
+			v3.z = fabsf(tfc->verts[3].z - ts->center.z);
 
 			if (v3.x > ts->radius) ts->radius = v3.x;
 			if (v3.y > ts->radius) ts->radius = v3.y;
@@ -540,7 +552,7 @@ void track_load_sections(char *file_name) {
 
 #include <kos.h>
 
-extern pvr_vertex_t __attribute__((aligned(32))) vs[5];
+extern pvr_vertex_t vs[5];
 
 extern void memcpy32(const void *dst, const void *src, size_t s);
 
@@ -551,7 +563,7 @@ void track_draw_section(section_t *section) {
 	int16_t fc2 = section->face_count >> 1;
 	int16_t leftover = face_count & 1;
 
-	void *vp = (void *)face->vp;
+	void *vp = (void *)face->verts;
  	for (int16_t j = 0; j < fc2; j++) {
 		// this is about as good as it gets for setting up
 		// one quad for rendering
@@ -624,14 +636,15 @@ void track_cycle_pickups(void) {
 }
 
 void track_face_set_color(track_face_t *face, uint8_t r, uint8_t g, uint8_t b) {
-	uint32_t lcol = 0xff000000 | (r<<16) | (g<<8) | b;
+	uint32_t facecolor = 0xff000000 | (r<<16) | (g<<8) | b;
 
-	face->vp[0].argb = lcol;
-	face->vp[1].argb = lcol;
-	face->vp[2].argb = lcol;
-	face->vp[3].argb = lcol;
+	face->verts[0].argb = facecolor;
+	face->verts[1].argb = facecolor;
+	face->verts[2].argb = facecolor;
+	face->verts[3].argb = facecolor;
 
-	face->vp[0].oargb = lcol;
+	// this tells `render_quad` to do special blending
+	face->verts[0].oargb = facecolor;
 }
 
 track_face_t *track_section_get_base_face(section_t *section) {
