@@ -9,8 +9,7 @@
 #define MAXINT ((int)0x7fffffff) /* max pos 32-bit int */
 #define MININT ((int)0x80000000) /* max negative 32-bit integer */
 #define recip255 0.0039215688593685626983642578125f
-static uint32_t LightGetHSV(uint8_t r, uint8_t g, uint8_t b)
-{
+static uint32_t LightGetHSV(uint8_t r, uint8_t g, uint8_t b) {
 	uint8_t h_, s_, v_;
 	int min;
 	int max;
@@ -97,8 +96,7 @@ static uint32_t LightGetHSV(uint8_t r, uint8_t g, uint8_t b)
 ===================
 */
 
-static uint32_t LightGetRGB(uint8_t h, uint8_t s, uint8_t v)
-{
+static uint32_t LightGetRGB(uint8_t h, uint8_t s, uint8_t v) {
 	uint8_t r, g, b;
 
 	float x;
@@ -187,18 +185,50 @@ uint32_t argb_from_u32(uint32_t v) {
 	_v = hsv & 0xFF;
 
 	factor = _v;
-			
-	l_flt = (float)factor * 2.0f;
+
+	l_flt = (float)factor * 2.2f;
 
 	_v = (int)l_flt;
 
 	if (_v < 0)
 		_v = 0;
 	if (_v > 255)
-		_v = 255;			
-			
+		_v = 255;
+
 	int rgb = LightGetRGB(h, s, _v);
 	return 0xff000000 | (rgb & 0x00ffffff);
+}
+
+uint32_t argb_from_u32_usealpha(uint32_t v) {
+	float l_flt;
+	int factor;
+	int h, s, _v;
+	int hsv;
+	uint8_t vr,vg,vb;
+
+	vr = ((v >> 24) & 0xff);
+	vg = ((v >> 16) & 0xff);
+	vb = ((v >> 8) & 0xff);
+
+ 	hsv = LightGetHSV(vr, vg, vb);
+
+	h = (hsv >> 16) & 0xFF;
+	s = (hsv >> 8) & 0xFF;
+	_v = hsv & 0xFF;
+
+	factor = _v;
+
+	l_flt = (float)factor * 2.2f;
+
+	_v = (int)l_flt;
+
+	if (_v < 0)
+		_v = 0;
+	if (_v > 255)
+		_v = 255;
+
+	int rgb = LightGetRGB(h, s, _v);
+	return (v << 24) | (rgb & 0x00ffffff);
 }
 
 vec3_t vec3_wrap_angle(vec3_t a) {
@@ -217,14 +247,11 @@ float vec3_angle(vec3_t a, vec3_t b) {
 
 	float magnitude = lena * lenb;
 
-	float cosine = (magnitude == 0)
+	float cosine = (magnitude < 0.001f)
 		? 1
 		: dot * approx_recip(magnitude);
 
-// this is how I know the clamp isn't needed
-//	if (cosine < -1.0f) printf("cosine < -1\n");
-//	if (cosine > 1.0f) printf("cosine > 1\n");
-	return acosf(/* clamp( */cosine/* , -1, 1) */);
+	return acosf(cosine);
 }
 
 // this gets used to resolve ship-ship collisions
@@ -239,8 +266,7 @@ vec3_t vector_transform(vector_t a) {
 	return vec3(rx,ry,rz);
 }
 
-vec3_t vec3_transform(vec3_t a, mat4_t *mat) {
-#if 1
+vec3_t vec3_transform(vec3_t a , mat4_t *mat) {
 	float w = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], a.x, a.y, a.z, 1);
 
 	float recipw = approx_recip(w);
@@ -252,18 +278,6 @@ vec3_t vec3_transform(vec3_t a, mat4_t *mat) {
 	float rz = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], a.x, a.y, a.z, 1);
 	rz *= recipw;
 	return vec3(rx,ry,rz);
-#else
-	float w = mat->m[3] * a.x + mat->m[7] * a.y + mat->m[11] * a.z + mat->m[15];
-	if (w == 0) {
-		w = 1;
-	}
-	float recipw = approx_recip(w);
-	return vec3(
-		(mat->m[0] * a.x + mat->m[4] * a.y + mat->m[ 8] * a.z + mat->m[12]) *recipw,
-		(mat->m[1] * a.x + mat->m[5] * a.y + mat->m[ 9] * a.z + mat->m[13]) *recipw,
-		(mat->m[2] * a.x + mat->m[6] * a.y + mat->m[10] * a.z + mat->m[14]) *recipw
-	);
-#endif
 }
 
 vec3_t vec3_project_to_ray(vec3_t p, vec3_t r0, vec3_t r1) {
@@ -328,15 +342,8 @@ void mat4_set_roll_pitch_yaw(mat4_t *mat, vec3_t rot) {
 }
 
 void mat4_translate(mat4_t *mat, vec3_t translation) {
-#if 1
 	mat->m[12] = fipr(mat->m[0], mat->m[4], mat->m[8], mat->m[12], translation.x, translation.y, translation.z, 1);
 	mat->m[13] = fipr(mat->m[1], mat->m[5], mat->m[9], mat->m[13], translation.x, translation.y, translation.z, 1);
 	mat->m[14] = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], translation.x, translation.y, translation.z, 1);
 	mat->m[15] = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], translation.x, translation.y, translation.z, 1);
-#else
-	mat->m[12] = mat->m[0] * translation.x + mat->m[4] * translation.y + mat->m[8] * translation.z + mat->m[12];
-	mat->m[13] = mat->m[1] * translation.x + mat->m[5] * translation.y + mat->m[9] * translation.z + mat->m[13];
-	mat->m[14] = mat->m[2] * translation.x + mat->m[6] * translation.y + mat->m[10] * translation.z + mat->m[14];
-	mat->m[15] = mat->m[3] * translation.x + mat->m[7] * translation.y + mat->m[11] * translation.z + mat->m[15];
-#endif	
 }

@@ -30,13 +30,6 @@ typedef union {
 } mat4_t;
 
 typedef struct {
-	vec3_t pos;
-	vec2_t uv;
-	rgba_t color;
-	int spec;
-} vertex_t;
-
-typedef struct {
 	pvr_vertex_t vertices[3];
 } tris_t;
 
@@ -163,14 +156,6 @@ static inline float vec3_dot(vec3_t a, vec3_t b) {
 	return dot;
 }
 
-static inline vec3_t vec3_lerp(vec3_t a, vec3_t b, float t) {
-	return vec3(
-		a.x + t * (b.x - a.x),
-		a.y + t * (b.y - a.y),
-		a.z + t * (b.z - a.z)
-	);
-}
-
 static inline vec3_t vec3_normalize(vec3_t a) {
 	// this is only used in one place and it is ok to modify
 	vec3f_normalize(a.x,a.y,a.z);
@@ -178,16 +163,16 @@ static inline vec3_t vec3_normalize(vec3_t a) {
 }
 
 static inline float wrap_angle(float a) {
-	a = fmodf(a + F_PI, twopi_i754);
+    a += F_PI;
 
-	if (a < 0) {
-		a += twopi_i754;
-	}
+    if (a > twopi_i754) a -= twopi_i754;
+    else if (a < 0) a += twopi_i754;
 
-	return a - F_PI;
+    return a - F_PI;
 }
 
 uint32_t argb_from_u32(uint32_t v);
+uint32_t argb_from_u32_usealpha(uint32_t v);
 float vec3_angle(vec3_t a, vec3_t b);
 vec3_t vec3_wrap_angle(vec3_t a);
 vec3_t vec3_normalize(vec3_t a);
