@@ -76,13 +76,43 @@ static void button_quit(menu_t *menu, int data) {
 }
 
 static void button_music_track(menu_t *menu, int data) {
-	sfx_music_play(data);
 	sfx_music_mode(SFX_MUSIC_LOOP);
+	sfx_music_play(data);
 }
 
+extern volatile uint32_t last_five_tracks[5];
+
 static void button_music_random(menu_t *menu, int data) {
-	sfx_music_play(rand_int(0, len(def.music)));
 	sfx_music_mode(SFX_MUSIC_RANDOM);
+//	sfx_music_play(rand_int(0, len(def.music)));
+	uint32_t new_index = rand_int(0, len(def.music));
+
+	int try_again = 0;
+	for (int li_idx = 0; li_idx < 5; li_idx++) {
+		if (last_five_tracks[li_idx] == new_index) {
+			try_again = 1;
+			break;
+		}
+	}
+	// never repeat a song in random, and try not to repeat last 5 unique music indices
+	while (try_again) {
+		try_again = 0;
+		new_index = rand_int(0, len(def.music));
+		for (int li_idx = 0; li_idx < 5; li_idx++) {
+			if (last_five_tracks[li_idx] == new_index) {
+				try_again = 1;
+				break;
+			}
+		}
+	}
+
+	for (int i = 1; i < 5; i++) {
+		last_five_tracks[i-1] = last_five_tracks[i];
+	}
+
+	last_five_tracks[4] = new_index;
+
+	sfx_music_play(new_index);
 }
 
 static void button_music(menu_t *menu, int data) {

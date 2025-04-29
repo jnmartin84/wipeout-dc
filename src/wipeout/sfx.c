@@ -21,6 +21,8 @@ typedef struct {
 static float unpause_sfx_volume;
 static float unpause_music_volume;
 
+volatile uint32_t last_five_tracks[5] = {-1,-1,-1,-1,-1};
+
 volatile uint32_t music_track_index;
 sfx_music_mode_t music_mode;
 
@@ -396,23 +398,43 @@ void *song_worker(void *arg) {
 			// so clear this flag to indicate to the next iteration of the loop
 			// to not wait again
 			song_interrupted = 1;
-			if (music_mode == SFX_MUSIC_SCENECHANGE) {
-				music_mode = SFX_MUSIC_RANDOM;
-			}
 		}
 
-		thd_pass();		
+		thd_pass();
+
+		if (music_mode == SFX_MUSIC_SCENECHANGE) {
+			music_mode = SFX_MUSIC_RANDOM;
+		}
 
 		// if we made it to the end of the song without being interrupted,
 		// do the music logic from the original mixer code
 		if (!song_interrupted) {
 			if (music_mode == SFX_MUSIC_RANDOM) {
-				uint32_t last_index = music_track_index;
 				music_track_index = rand_int(0, len(def.music));
-				// never repeat a song in random
-				while (music_track_index == last_index) {
-					music_track_index = rand_int(0, len(def.music));					
+				int try_again = 0;
+				for (int li_idx = 0; li_idx < 5; li_idx++) {
+					if (last_five_tracks[li_idx] == music_track_index) {
+						try_again = 1;
+						break;
+					}
 				}
+				// never repeat a song in random, and try not to repeat last 5 unique music indices
+				while (try_again) {
+					try_again = 0;
+					music_track_index = rand_int(0, len(def.music));
+					for (int li_idx = 0; li_idx < 5; li_idx++) {
+						if (last_five_tracks[li_idx] == music_track_index) {
+							try_again = 1;
+							break;
+						}
+					}
+				}
+
+				for (int i = 1; i < 5; i++) {
+					last_five_tracks[i - 1] = last_five_tracks[i];
+				}
+
+				last_five_tracks[4] = music_track_index;
 			}
 			// I'm not sure why there is sequential, it doesn't even get used in the code
 			else if (music_mode == SFX_MUSIC_SEQUENTIAL) {
@@ -420,7 +442,7 @@ void *song_worker(void *arg) {
 			}
 		}
 
-		thd_pass();		
+		thd_pass();
 	}
 
 	return NULL;

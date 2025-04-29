@@ -12,14 +12,41 @@ static float start_time;
 static bool has_shown_attract = false;
 
 extern global_render_state_t render_state;
-
+extern volatile uint32_t last_five_tracks[5];
 void title_init(void) {
 	render_state.LOAD_UNFILTERED = 1;
 	title_image = image_get_texture("wipeout/textures/wiptitle.tim");
 	render_state.LOAD_UNFILTERED = 0;
 	start_time = system_time();
 	sfx_music_mode(SFX_MUSIC_RANDOM);
-	sfx_music_play(rand_int(0, len(def.music)));
+	uint32_t new_index = rand_int(0, len(def.music));
+
+	int try_again = 0;
+	for (int li_idx = 0; li_idx < 5; li_idx++) {
+		if (last_five_tracks[li_idx] == new_index) {
+			try_again = 1;
+			break;
+		}
+	}
+	// never repeat a song in random, and try not to repeat last 5 unique music indices
+	while (try_again) {
+		try_again = 0;
+		new_index = rand_int(0, len(def.music));
+		for (int li_idx = 0; li_idx < 5; li_idx++) {
+			if (last_five_tracks[li_idx] == new_index) {
+				try_again = 1;
+				break;
+			}
+		}
+	}
+
+	for (int i = 1; i < 5; i++) {
+		last_five_tracks[i - 1] = last_five_tracks[i];
+	}
+
+	last_five_tracks[4] = new_index;
+
+	sfx_music_play(new_index);
 }
 
 void title_update(void) {

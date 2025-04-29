@@ -27,7 +27,7 @@ static bool is_paused = false;
 static bool menu_is_scroll_text = false;
 static float attract_start_time;
 static menu_t *active_menu = NULL;
-extern volatile uint32_t music_track_index;
+extern volatile uint32_t last_five_tracks[5];
 void race_init(void) {
 	ingame_menus_load();
 	menu_is_scroll_text = false;
@@ -61,14 +61,36 @@ void race_init(void) {
 	}
 
 	is_paused = false;
-	uint32_t last_index = music_track_index;
-	music_track_index = rand_int(0, len(def.music));
-	// never repeat a song in random
-	while (music_track_index == last_index) {
-		music_track_index = rand_int(0, len(def.music));
+
+	uint32_t new_index = rand_int(0, len(def.music));
+
+	int try_again = 0;
+	for (int li_idx = 0; li_idx < 5; li_idx++) {
+		if (last_five_tracks[li_idx] == new_index) {
+			try_again = 1;
+			break;
+		}
 	}
+	// never repeat a song in random, and try not to repeat last 5 unique music indices
+	while (try_again) {
+		try_again = 0;
+		new_index = rand_int(0, len(def.music));
+		for (int li_idx = 0; li_idx < 5; li_idx++) {
+			if (last_five_tracks[li_idx] == new_index) {
+				try_again = 1;
+				break;
+			}
+		}
+	}
+
+	for (int i = 1; i < 5; i++) {
+		last_five_tracks[i-1] = last_five_tracks[i];
+	}
+
+	last_five_tracks[4] = new_index;
+
 	sfx_music_mode(SFX_MUSIC_SCENECHANGE);
-	sfx_music_play(music_track_index);
+	sfx_music_play(new_index);
 }
 
 extern int sprites_to_draw;

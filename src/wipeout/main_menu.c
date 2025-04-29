@@ -833,7 +833,7 @@ static void objects_unpack_imp(Object **dest_array, int len, Object *src) {
 }
 
 extern global_render_state_t render_state;
-
+extern volatile uint32_t last_five_tracks[5];
 void main_menu_init(void) {
 	render_state.in_menu = 1;
 	g.is_attract_mode = false;
@@ -877,7 +877,35 @@ void main_menu_init(void) {
 
 	// don't play music until everything is loaded from disc
 	sfx_music_mode(SFX_MUSIC_RANDOM);
-	sfx_music_play(rand_int(0, len(def.music)));
+//	sfx_music_play(rand_int(0, len(def.music)));
+	uint32_t new_index = rand_int(0, len(def.music));
+
+	int try_again = 0;
+	for (int li_idx = 0; li_idx < 5; li_idx++) {
+		if (last_five_tracks[li_idx] == new_index) {
+			try_again = 1;
+			break;
+		}
+	}
+	// never repeat a song in random, and try not to repeat last 5 unique music indices
+	while (try_again) {
+		try_again = 0;
+		new_index = rand_int(0, len(def.music));
+		for (int li_idx = 0; li_idx < 5; li_idx++) {
+			if (last_five_tracks[li_idx] == new_index) {
+				try_again = 1;
+				break;
+			}
+		}
+	}
+
+	for (int i = 1; i < 5; i++) {
+		last_five_tracks[i-1] = last_five_tracks[i];
+	}
+
+	last_five_tracks[4] = new_index;
+
+	sfx_music_play(new_index);
 }
 
 extern pvr_dr_state_t dr_state;
