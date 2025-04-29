@@ -39,7 +39,7 @@ void system_update(void) {
 	float time_real_now = platform_now();
 	float real_delta = time_real_now - time_real;
 	time_real = time_real_now;
-	tick_last = real_delta; // fminf(real_delta, 0.1f) * time_scale;
+	tick_last = fminf(real_delta, 0.1f) * time_scale;
 	time_scaled += tick_last;
 
 	// FIXME: come up with a better way to wrap the cycle_time, so that it

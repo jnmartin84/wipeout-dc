@@ -365,9 +365,6 @@ vec2i_t platform_screen_size(void) {
 #include <kos.h>
 
 int main(int argc, char *argv[]) {
-
-	thd_set_hz(200);
-
 	// Figure out the absolute asset and userdata paths. These may either be
 	// supplied at build time through -DPATH_ASSETS=.. and -DPATH_USERDATA=..
 	// or received at runtime from SDL. Note that SDL may return NULL for these.

@@ -66,7 +66,7 @@ cdi:
 	$(RM) wipeout-rewrite.cdi
 	cp sonic.raw wipeout/common
 	cp dcpad.bin wipeout/common
-        cp art/PVR/US1_0GDTEX.PVR ./0GDTEX.PVR
+	cp art/PVR/US1_0GDTEX.PVR ./0GDTEX.PVR
 	mkdcdisc -f 0GDTEX.PVR -d wipeout -e $(BUILD_DIR)/$(TARGET) -o wipeout-rewrite.cdi -n "WIPEOUT" -N
 
 dcload: $(TARGET)
