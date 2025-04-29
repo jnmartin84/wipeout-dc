@@ -327,7 +327,7 @@ void weapon_update_mine_wait_for_release(weapon_t *self) {
 void weapon_update_mine_lights(weapon_t *self, int index) {
 	Prm prm = {.primitive = self->model->primitives};
 
-	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * 64 + 64;
+	uint8_t r = sinf(system_cycle_time() * twopi_i754 + index * 0.66) * (255-64) + 64;
 	for (int i = 0; i < 8; i++) {
 		switch (prm.primitive->type) {
 		case PRM_TYPE_GT3:
