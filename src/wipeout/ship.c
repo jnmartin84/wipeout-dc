@@ -172,14 +172,17 @@ void ships_draw(void) {
 			int pilot_secnum = g.ships[g.pilot].section_num;
 			int other_secnum = g.ships[i].section_num;
 
-			if ((other_secnum - VIS_TEST_DIST) < 0) other_secnum = other_secnum + sc;
-			if ((pilot_secnum - VIS_TEST_DIST) < 0) pilot_secnum = pilot_secnum + sc;
-
-			distance = abs(other_secnum - pilot_secnum);
+			if (abs(other_secnum - pilot_secnum) < VIS_TEST_DIST) {
+				distance = abs(other_secnum - pilot_secnum);
+			} else {
+				if ((other_secnum - VIS_TEST_DIST) < 0) other_secnum = other_secnum + sc;
+				if ((pilot_secnum - VIS_TEST_DIST) < 0) pilot_secnum = pilot_secnum + sc;
+				distance = abs(other_secnum - pilot_secnum);
+			}
 
 			if (distance < VIS_TEST_DIST) {
 				draw_this |= (1 << i);
-			}			
+			}
 		}
 
 		ship_draw(&g.ships[i], draw_this & (1 << i));
