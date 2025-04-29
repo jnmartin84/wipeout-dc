@@ -1,27 +1,19 @@
 /**
  * WARNING
  * 
- * You will see many things in here that look "bad" such as:
- * - things being recomputed or re-set that can be computed/set exactly once and behave identically
- * - loops AND manually unrolled sections working on the same arrays for different purposes
+ * You will see many things in here that look "bad".
  * 
  * You will be tempted to change them for consistency or "efficiency."
  * 
- * When you do, you are going to lose 20% of the rendering throughput.
+ * When you do, you are going to lose a bunch of rendering throughput.
  * 
  * Something, or many things, are sensitive to the code generation and memory layout after
- * compiling `-O3` with LTO enabled. Cache thrashing over the most MINOR of changes such as:
- * 
- * `int notex = (texture_index == RENDER_NO_TEXTURE);` -- FAST
- * `int notex = !texture_index;` -- 5 to 10 FPS slower
- * 
- * using a constant 255 instead of the calculated a0/1/2/3/4 in the vertex alpha fading code -- 5+ fps drop
+ * compiling `-O3` with LTO enabled.
  *
  * I have thought of these things, I have tried them. Things here are left as they are for a reason.
  * 
  * The current state of the repo is the version of the code producing the maximum output so far.
  */
-
 
 #include "system.h"
 #include "render.h"
@@ -506,10 +498,14 @@ static float wout;
 #define cliplerp(__a, __b, __t) ((__a) + (((__b) - (__a))*(__t)))
 
 static void  __attribute__((noinline)) nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, float w0, float w1) {
+#if 0
 	const float d0 = w0 + v0->z;
 	const float d1 = w1 + v1->z;
 	const float d1subd0 = d1 - d0;
 	const float t = fabsf(d0 * approx_recip(d1subd0));
+#else
+	const float t = fabsf(v0->z * approx_recip(v1->z - v0->z));
+#endif
 	wout = cliplerp(w0, w1, t);
 	outv->x = cliplerp(v0->x, v1->x, t);
 	outv->y = cliplerp(v0->y, v1->y, t);
@@ -1242,10 +1238,6 @@ quad_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-//	for (int i=0;i<sendverts;i++) {
-//		vs[i].u += 0.02f;
-//		vs[i].v += 0.01f;
-//	}
 
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
@@ -1389,11 +1381,6 @@ tri_sendit:
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
-//	for (int i=0;i<sendverts;i++) {
-//		vs[i].u += 0.02f;
-//		vs[i].v += 0.01f;
-//	}
-
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
@@ -1464,11 +1451,6 @@ void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index
 	perspdiv(&vs[2], w2);
 	perspdiv(&vs[3], w3);
 
-//	for (int i=0;i<4;i++) {
-//		vs[i].u += 0.02f;
-//		vs[i].v += 0.01f;
-//	}
-
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
 		render_state.last_index = texture_index;
@@ -1527,11 +1509,6 @@ void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
-
-//	for (int i=0;i<3;i++) {
-//		vs[i].u += 0.02f;
-//		vs[i].v += 0.01f;
-//	}
 
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
@@ -1720,17 +1697,6 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 					for (uint32_t y = 0; y < th; y++)
 						for(uint32_t x = 0; x < tw; x++)
 							tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
-#if 0
-					// for all rows in source texture, fill horizontal pow2 padding by repeating pixels from x = 0
-					for (uint32_t y = 0; y < th; y++)
-						for(uint32_t x = tw; x < wp2; x++)
-							tmpstore[(y*wp2) + x] = pixels[(y*tw) + (x-tw)];
-
-					// for all rows in vertical pow2 padding, fill by repeating full padded rows from y = 0
-					for (uint32_t y = th; y < hp2; y++)
-						for(uint32_t x = 0; x < wp2; x++)
-							tmpstore[(y*wp2) + x] = tmpstore[((y-th)*wp2) + x];
-#endif
 				} else {
 					// copy source texture into larger pow2-padded texture
 					for (uint32_t y = 0; y < th; y++)
