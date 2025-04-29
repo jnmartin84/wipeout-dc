@@ -10,13 +10,9 @@ static particle_t *particles;
 static int particles_active = 0;
 static texture_list_t particle_textures;
 
-extern global_render_state_t render_state;
-
 void particles_load(void) {
 	particles = mem_bump(sizeof(particle_t) * PARTICLES_MAX);
-	render_state.LOAD_UNFILTERED = 1;
 	particle_textures = image_get_compressed_textures("wipeout/common/effects.cmp");
-	render_state.LOAD_UNFILTERED = 0;
 	particles_init();
 }
 
