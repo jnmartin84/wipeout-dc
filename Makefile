@@ -66,7 +66,8 @@ cdi:
 	$(RM) wipeout-rewrite.cdi
 	cp sonic.raw wipeout/common
 	cp dcpad.bin wipeout/common
-	mkdcdisc -d wipeout -e $(BUILD_DIR)/$(TARGET) -o wipeout-rewrite.cdi -n "WIPEOUT" -N
+        cp art/PVR/US1_0GDTEX.PVR ./0GDTEX.PVR
+	mkdcdisc -f 0GDTEX.PVR -d wipeout -e $(BUILD_DIR)/$(TARGET) -o wipeout-rewrite.cdi -n "WIPEOUT" -N
 
 dcload: $(TARGET)
 	sudo ./dcload-ip/host-src/tool/dc-tool-ip -x $(BUILD_DIR)/$(TARGET) -c ./
