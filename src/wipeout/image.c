@@ -20,6 +20,8 @@
 #define TIM_TYPE_PALETTED_8_BPP 0x09
 #define TIM_TYPE_TRUE_COLOR_16_BPP 0x02
 
+int is_sky = 0;
+
 #define get_color_argb1555(rrr, ggg, bbb, aaa)						\
 	((uint16_t)(((aaa & 1) << 15) | (((rrr >> 3) & 0x1f) << 10) |	\
 		    (((ggg >> 3) & 0x1f) << 5) | ((bbb >> 3) & 0x1f)))
@@ -284,11 +286,15 @@ texture_list_t image_get_compressed_textures(char *name) {
 	cmp_t *cmp = image_load_compressed(name);
 	texture_list_t list = {.start = render_textures_len(), .len = cmp->len};
 
+	is_sky = strstr(name, "sky") != NULL;
+
 	for (int i = 0; i < cmp->len; i++) {
 		image_t *image = image_load_from_bytes(cmp->entries[i], false);
 		render_texture_create(image->width, image->height, image->pixels);
 		mem_temp_free(image);
 	}
+
+	is_sky = 0;
 
 	mem_temp_free(cmp);
 	return list;

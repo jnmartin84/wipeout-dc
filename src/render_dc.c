@@ -296,9 +296,6 @@ void render_init(void) {
 	pvr_poly_cxt_t ccxt;
 	pvr_init(&pvr_params);
 
-	// change the texel sample-point to 0,0 instead of 0.5,0.5
-	PVR_SET(PVR_UNK_0080, 0);
-
 	// 3mb VRAM block for glDC allocator
 	pvr_ptr_t block = pvr_mem_malloc((1048576*3)+2048);
 	if (-1 == alloc_init((void*)block, (1048576*3)))
@@ -507,16 +504,13 @@ void render_set_cull_backface(bool enabled) {
 
 static float wout;
 #define cliplerp(__a, __b, __t) ((__a) + (((__b) - (__a))*(__t)))
-//static uint32_t color_lerp(float ft, uint32_t c1, uint32_t c2) {
-//	if (ft < 0.5f) return c1;
-//	return c2;
-//}
 
 static void  __attribute__((noinline)) nearz_clip(pvr_vertex_t *v0, pvr_vertex_t *v1, pvr_vertex_t *outv, float w0, float w1) {
 	const float d0 = w0 + v0->z;
 	const float d1 = w1 + v1->z;
 	const float d1subd0 = d1 - d0;
-	const float t = (fabsf(d0) * approx_recip(d1subd0));
+	const float t = fabsf(d0 * approx_recip(d1subd0));
+	wout = cliplerp(w0, w1, t);
 	outv->x = cliplerp(v0->x, v1->x, t);
 	outv->y = cliplerp(v0->y, v1->y, t);
 	outv->z = cliplerp(v0->z, v1->z, t);
@@ -524,8 +518,8 @@ static void  __attribute__((noinline)) nearz_clip(pvr_vertex_t *v0, pvr_vertex_t
 	outv->v = cliplerp(v0->v, v1->v, t);
 	// these won't matter again until lighting is added
 	outv->argb = v0->argb;//color_lerp(t, v0->argb, v1->argb);
-//	outv->oargb = v0->oargb;//color_lerp(t, v0->oargb, v1->oargb);
-	wout = cliplerp(w0, w1, t);
+//	if (v0->oargb)
+//		outv->oargb = v0->oargb;//color_lerp(t, v0->oargb, v1->oargb);
 }
 
 void SetShake(float duration) {
@@ -652,12 +646,10 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 		// quad only 0 visible
 		case 1:
 			sendverts = 3;
-			// this was the bug (#20)
-			// was doing 010 and modifying 0 before 022
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
 			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
-			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-			w0 = wout;
 
 			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
@@ -668,6 +660,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 			sendverts = 3;
 
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
 			nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
 			w2 = wout;
 
@@ -720,7 +713,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 			w3 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-			vs[4].flags = PVR_CMD_VERTEX_EOL;
+//			vs[4].flags = PVR_CMD_VERTEX_EOL;
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -764,7 +757,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 			w2 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-			vs[4].flags = PVR_CMD_VERTEX_EOL;
+//			vs[4].flags = PVR_CMD_VERTEX_EOL;
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -1077,10 +1070,10 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 		case 1:
 			sendverts = 3;
 
+			nearz_clip(&vs[0], &vs[1], &vs[1], w0, w1);
+			w1 = wout;
 			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
-			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
-			w0 = wout;
 
 			vs[2].flags = PVR_CMD_VERTEX_EOL;
 
@@ -1091,6 +1084,7 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 			sendverts = 3;
 
 			nearz_clip(&vs[0], &vs[1], &vs[0], w0, w1);
+			w0 = wout;
 			nearz_clip(&vs[1], &vs[3], &vs[2], w1, w3);
 			w2 = wout;
 
@@ -1248,6 +1242,10 @@ quad_sendit:
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
+//	for (int i=0;i<sendverts;i++) {
+//		vs[i].u += 0.02f;
+//		vs[i].v += 0.01f;
+//	}
 
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
@@ -1391,6 +1389,11 @@ tri_sendit:
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
+//	for (int i=0;i<sendverts;i++) {
+//		vs[i].u += 0.02f;
+//		vs[i].v += 0.01f;
+//	}
+
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
@@ -1461,6 +1464,11 @@ void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index
 	perspdiv(&vs[2], w2);
 	perspdiv(&vs[3], w3);
 
+//	for (int i=0;i<4;i++) {
+//		vs[i].u += 0.02f;
+//		vs[i].v += 0.01f;
+//	}
+
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
 		render_state.last_index = texture_index;
@@ -1519,6 +1527,11 @@ void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index
 	perspdiv(&vs[0], w0);
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
+
+//	for (int i=0;i<3;i++) {
+//		vs[i].u += 0.02f;
+//		vs[i].v += 0.01f;
+//	}
 
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
@@ -1618,8 +1631,8 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[0].x = pos.x;
 	vs[0].y = pos.y;
 	vs[0].z = screen_2d_z;
-	vs[0].u = (uv_offset.x + 0.5f) * rpw;
-	vs[0].v = (uv_offset.y + 0.5f) * rph;
+	vs[0].u = (uv_offset.x) * rpw;
+	vs[0].v = (uv_offset.y) * rph;
 	vs[0].argb = lcol;
 	vs[0].oargb = 0;
 
@@ -1627,8 +1640,8 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[1].x = pos.x + size.x;
 	vs[1].y = pos.y;
 	vs[1].z = screen_2d_z;
-	vs[1].u = (uv_offset.x + uv_size.x - 0.5f) * rpw;
-	vs[1].v = (uv_offset.y + 0.5f) * rph;
+	vs[1].u = (uv_offset.x + uv_size.x) * rpw;
+	vs[1].v = (uv_offset.y) * rph;
 	vs[1].argb = lcol;
 //	vs[1].oargb = 0;
 
@@ -1636,8 +1649,8 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[2].x = pos.x;
 	vs[2].y = pos.y + size.y;
 	vs[2].z = screen_2d_z;
-	vs[2].u = (uv_offset.x + 0.5f) * rpw;
-	vs[2].v = (uv_offset.y + uv_size.y - 0.5f) * rph;
+	vs[2].u = (uv_offset.x) * rpw;
+	vs[2].v = (uv_offset.y + uv_size.y) * rph;
 	vs[2].argb = lcol;
 //	vs[2].oargb = 0;
 
@@ -1645,8 +1658,8 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[3].x = pos.x + size.x;
 	vs[3].y = pos.y + size.y;
 	vs[3].z = screen_2d_z;
-	vs[3].u = (uv_offset.x + uv_size.x - 0.5f) * rpw;
-	vs[3].v = (uv_offset.y + uv_size.y - 0.5f) * rph;
+	vs[3].u = (uv_offset.x + uv_size.x) * rpw;
+	vs[3].v = (uv_offset.y + uv_size.y) * rph;
 	vs[3].argb = lcol;
 //	vs[3].oargb = 0;
 
@@ -1654,6 +1667,8 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 }
 
 #include "platform.h"
+
+extern int is_sky;
 
 uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 	uint16_t texture_index = textures_len++;
@@ -1700,20 +1715,32 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 
 				textures[texture_index] = (render_texture_t){ {wp2, hp2}, {tw, th} };
 
+				if (!is_sky)  {
 				// copy source texture into larger pow2-padded texture
-				for (uint32_t y = 0; y < th; y++)
-					for(uint32_t x = 0; x < tw; x++)
-						tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
+					for (uint32_t y = 0; y < th; y++)
+						for(uint32_t x = 0; x < tw; x++)
+							tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
+#if 0
+					// for all rows in source texture, fill horizontal pow2 padding by repeating pixels from x = 0
+					for (uint32_t y = 0; y < th; y++)
+						for(uint32_t x = tw; x < wp2; x++)
+							tmpstore[(y*wp2) + x] = pixels[(y*tw) + (x-tw)];
 
-				// for all rows in source texture, fill horizontal pow2 padding by repeating pixels from x = 0
-				for (uint32_t y = 0; y < th; y++)
-					for(uint32_t x = tw; x < wp2; x++)
-						tmpstore[(y*wp2) + x] = pixels[(y*tw) + (x-tw)];
+					// for all rows in vertical pow2 padding, fill by repeating full padded rows from y = 0
+					for (uint32_t y = th; y < hp2; y++)
+						for(uint32_t x = 0; x < wp2; x++)
+							tmpstore[(y*wp2) + x] = tmpstore[((y-th)*wp2) + x];
+#endif
+				} else {
+					// copy source texture into larger pow2-padded texture
+					for (uint32_t y = 0; y < th; y++)
+						for(uint32_t x = 0; x < tw; x++)
+							tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
 
-				// for all rows in vertical pow2 padding, fill by repeating full padded rows from y = 0
-				for (uint32_t y = th; y < hp2; y++)
-					for(uint32_t x = 0; x < wp2; x++)
-						tmpstore[(y*wp2) + x] = tmpstore[(y*th) + x];
+					// for sky texture, copy first source column over last source column
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+(tw-1)] = pixels[(y*tw)];
+				}
 
 				pvr_txr_load_ex(tmpstore, ptrs[texture_index], wp2, hp2, PVR_TXRLOAD_16BPP);
 				mem_temp_free(tmpstore);
