@@ -217,7 +217,7 @@ static void update_header(uint16_t texture_index) {
 			header1 = (header1 & ~(PVR_TA_PM1_DEPTHCMP_MASK)) | (PVR_DEPTHCMP_ALWAYS << PVR_TA_PM1_DEPTHCMP_SHIFT);
 
 		// culling off
-		header1 &= ~(PVR_TA_PM1_CULLING_MASK);
+		//header1 &= ~(PVR_TA_PM1_CULLING_MASK);
 
 		// clear blending
 		header2 &= ~(PVR_TA_PM2_SRCBLEND_MASK | PVR_TA_PM2_DSTBLEND_MASK);
@@ -245,7 +245,6 @@ static void update_header(uint16_t texture_index) {
 
 		// culling on
 		header1 |= (PVR_CULLING_CCW << PVR_TA_PM1_CULLING_SHIFT);
-
 		hp = (uint32_t *)chdr[texture_index][1];
 		hp[1] = header1;
 		hp[2] = header2;
@@ -340,6 +339,18 @@ void render_reset_proj(float farval) {
 
 	vp_mat.m[10] = f1;
 	vp_mat.m[14] = f2;
+}
+
+void render_set_fov(float angle) {
+	float aspect = (float)screen_size.x / (float)screen_size.y;
+	float fov = (angle / 180.0f) * F_PI;
+	float f = 1.0f / tanf(fov * 0.5f);
+
+	projection_mat.m[0] = f / aspect;
+	projection_mat.m[5] = f;
+
+	vp_mat.m[0] = f / aspect;
+	vp_mat.m[5] = f;
 }
 
 void render_set_screen_size(vec2i_t size) {
@@ -441,14 +452,14 @@ void render_set_view_2d(void) {
 		0, 0, 2 * nf, 0,
 		(left + right) * lr, (top + bottom) * bt, (far + near) * nf, 1);
 
-	mat_load(&mvp_mat.cols);
+	fast_mat_load(&mvp_mat.cols);
 }
 
 extern void fast_mat_apply(const matrix_t *mat);
 
 void render_set_model_mat(mat4_t *m) {
 	mat_load_apply(&vp_mat.cols, &view_mat.cols);
-	mat_apply(&m->cols);
+	fast_mat_apply(&m->cols);
 }
 
 void render_set_model_ident(void) {
@@ -589,6 +600,9 @@ void render_hud_quad(uint16_t texture_index) {
 }
 
 void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
+	// ((vs[0].z >= -w0) | ((vs[1].z >= -w1) << 1) | ((vs[2].z >= -w2) << 2) | ((vs[3].z >= -w3) << 3))
+	uint32_t vismask;
+	uint8_t cl0, cl1, cl2, cl3;
 	float w0,w1,w2,w3,w4;
 
 	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
@@ -596,13 +610,14 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
 	mat_trans_single3_nodivw(vs[3].x, vs[3].y, vs[3].z, w3);
 
-	uint8_t cl0, cl1, cl2, cl3;
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
 	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
 	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+	vismask = (cl0 & 0x10) >> 4;
 
 	cl1 = !(vs[1].z >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
@@ -611,12 +626,16 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
+	vismask |= (cl1 & 0x10) >> 3;
+
 	cl2 = !(vs[2].z >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
 	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
 	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+	vismask |= (cl2 & 0x10) >> 2;
 
 	cl3 = !(vs[3].z >  w3);
 	cl3 = (cl3 << 1) | !(vs[3].z < -w3);
@@ -625,10 +644,11 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 	cl3 = (cl3 << 1) | !(vs[3].x >  w3);
 	cl3 = (cl3 << 1) | !(vs[3].x < -w3);
 
+	vismask |= (cl3 & 0x10) >> 1;
+
 	if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
 		return;
 
-	uint32_t vismask = ((vs[0].z >= -w0) | ((vs[1].z >= -w1) << 1) | ((vs[2].z >= -w2) << 2) | ((vs[3].z >= -w3) << 3));
 	int sendverts = 4;
 	int quad_is_pad = vs[0].oargb > 2;
 	vs[0].oargb = 0;
@@ -709,7 +729,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 			w3 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-//			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -749,11 +769,11 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 
 			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
 			w4 = wout;
-			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
 			w2 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-//			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -784,6 +804,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -803,6 +824,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -871,13 +893,14 @@ quad_sendit:
 
 void  __attribute__((noinline)) render_tri(uint16_t texture_index) {
 	float w0,w1,w2,w3;
+	uint8_t cl0, cl1, cl2;
+
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
 	mat_trans_single3_nodivw(vs[0].x, vs[0].y, vs[0].z, w0);
 	mat_trans_single3_nodivw(vs[1].x, vs[1].y, vs[1].z, w1);
 	mat_trans_single3_nodivw(vs[2].x, vs[2].y, vs[2].z, w2);
 
-	uint8_t cl0, cl1, cl2;
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
 	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
@@ -1013,6 +1036,9 @@ tri_sendit:
 }
 
 void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, float *w) {
+	// ((vs[0].z >= -w0) | ((vs[1].z >= -w1) << 1) | ((vs[2].z >= -w2) << 2) | ((vs[3].z >= -w3) << 3))
+	uint32_t vismask;
+	uint8_t cl0, cl1, cl2, cl3;
 	float w0,w1,w2,w3,w4;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
@@ -1021,13 +1047,14 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 	w2 = w[2];
 	w3 = w[3];
 
-  	uint8_t cl0, cl1, cl2, cl3;
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
 	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
 	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
+
+	vismask = (cl0 & 0x10) >> 4;
 
 	cl1 = !(vs[1].z >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
@@ -1036,12 +1063,16 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
 
+	vismask |= (cl1 & 0x10) >> 3;
+
 	cl2 = !(vs[2].z >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
 	cl2 = (cl2 << 1) | !(vs[2].y >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].y < -w2);
 	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
+
+	vismask |= (cl2 & 0x10) >> 2;
 
 	cl3 = !(vs[3].z >  w3);
 	cl3 = (cl3 << 1) | !(vs[3].z < -w3);
@@ -1050,10 +1081,11 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 	cl3 = (cl3 << 1) | !(vs[3].x >  w3);
 	cl3 = (cl3 << 1) | !(vs[3].x < -w3);
 
+	vismask |= (cl3 & 0x10) >> 1;
+
 	if ((cl0 | cl1 | cl2 | cl3) != 0x3f)
 		return;
 
-	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2) | (((vs[3].z >= -w3)) << 3));
 	int sendverts = 4;
 
 	if (vismask == 15) {
@@ -1133,7 +1165,7 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 			w3 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -1173,11 +1205,11 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 
 			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
 			w4 = wout;
-			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
+			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
 			w2 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
-			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -1208,6 +1240,7 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -1227,6 +1260,7 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 
 			vs[3].flags = PVR_CMD_VERTEX;
 			vs[4].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 			perspdiv(&vs[4], w4);
 
@@ -1264,14 +1298,16 @@ quad_sendit:
 }
 
 void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float *w) {
+	// ((vs[0].z >= -w0) | ((vs[1].z >= -w1) << 1) | ((vs[2].z >= -w2) << 2) | ((vs[3].z >= -w3) << 3));
+	uint32_t vismask;
+	uint8_t cl0, cl1, cl2;
+	uint8_t pad;
 	float w0,w1,w2,w3;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
-
+	(void)pad;
 	w0 = w[0];
 	w1 = w[1];
 	w2 = w[2];
-
-  	uint8_t cl0, cl1, cl2;
 
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].z < -w0);
@@ -1280,12 +1316,16 @@ void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float
 	cl0 = (cl0 << 1) | !(vs[0].x >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].x < -w0);
 
+	vismask = (cl0 & 0x10) >> 4;
+
 	cl1 = !(vs[1].z >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].z < -w1);
 	cl1 = (cl1 << 1) | !(vs[1].y >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].y < -w1);
 	cl1 = (cl1 << 1) | !(vs[1].x >  w1);
 	cl1 = (cl1 << 1) | !(vs[1].x < -w1);
+
+	vismask |= (cl1 & 0x10) >> 3;
 
 	cl2 = !(vs[2].z >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].z < -w2);
@@ -1294,10 +1334,11 @@ void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float
 	cl2 = (cl2 << 1) | !(vs[2].x >  w2);
 	cl2 = (cl2 << 1) | !(vs[2].x < -w2);
 
+	vismask |= (cl2 & 0x10) >> 2;
+
 	if ((cl0 | cl1 | cl2) != 0x3f)
 		return;
 
-	uint32_t vismask = (((vs[0].z >= -w0)) | (((vs[1].z >= -w1)) << 1) | (((vs[2].z >= -w2)) << 2));
 	int sendverts = 3;
 
 	if (vismask == 7) {
@@ -1332,6 +1373,7 @@ void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 
 			break;
@@ -1354,6 +1396,7 @@ void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 
 			break;
@@ -1370,6 +1413,7 @@ void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float
 
 			vs[2].flags = PVR_CMD_VERTEX;
 			vs[3].flags = PVR_CMD_VERTEX_EOL;
+
 			perspdiv(&vs[3], w3);
 
 			break;
@@ -1410,6 +1454,7 @@ tri_sendit:
 
 void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index, float *w) {
 	float w0,w1,w2,w3;
+	uint8_t cl0, cl1, cl2, cl3;
 
 	int notex = (texture_index == RENDER_NO_TEXTURE);
 
@@ -1418,7 +1463,6 @@ void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index
 	w2 = w[2];
 	w3 = w[3];
 
-	uint8_t cl0, cl1, cl2, cl3;
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
@@ -1478,13 +1522,16 @@ void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index
 
 void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index, float *w) {
 	float w0,w1,w2;
+ 	uint8_t cl0, cl1, cl2;
+	uint8_t pad;
 	int notex = (texture_index == RENDER_NO_TEXTURE);
+
+	(void)pad;
 
 	w0 = w[0];
 	w1 = w[1];
 	w2 = w[2];
 
- 	uint8_t cl0, cl1, cl2;
 	cl0 = !(vs[0].z >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y >  w0);
 	cl0 = (cl0 << 1) | !(vs[0].y < -w0);
@@ -1537,9 +1584,11 @@ void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index
 
 void  __attribute__((noinline)) render_push_sprite(vec3_t pos, vec2i_t size, uint32_t lcol, uint16_t texture_index) {
 	screen_2d_z += 0.0005f;
-	// this ordering fixes the drawing of sprites without disabling culling
+
 /* 	fast_mat_store(&storemat.cols);
 	fast_mat_load(&rot_sprite_mat.cols); */
+
+	// this ordering fixes the drawing of sprites without disabling culling
 	vec3_t t1 = vec3_transform(vec3( size.x * 0.5f, -size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
 	vec3_t t2 = vec3_transform(vec3(-size.x * 0.5f, -size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
 	vec3_t t3 = vec3_transform(vec3( size.x * 0.5f,  size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
@@ -1548,10 +1597,13 @@ void  __attribute__((noinline)) render_push_sprite(vec3_t pos, vec2i_t size, uin
 	vec3_t p2 = vec3_add(pos, t2);
 	vec3_t p3 = vec3_add(pos, t3);
 	vec3_t p4 = vec3_add(pos, t4);
-	render_texture_t *t = &textures[texture_index];
+
 /* 	fast_mat_load(&storemat.cols); */
+
+	render_texture_t *t = &textures[texture_index];
 	float rpw = approx_recip(t->offset.x);
 	float rph = approx_recip(t->offset.y);
+
 //	vs[0].flags = PVR_CMD_VERTEX;
 	vs[0].x = p1.x;
 	vs[0].y = p1.y;
@@ -1602,7 +1654,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 
 	screen_2d_z += 0.0005f;
 
-	uint32_t lcol = (color.a << 24) | (color.r << 16) | (color.g << 8) | (color.b);
+	uint32_t tilecol = (color.a << 24) | (color.r << 16) | (color.g << 8) | (color.b);
 
 //	vs[0].flags = PVR_CMD_VERTEX;
 	vs[0].x = pos.x;
@@ -1610,7 +1662,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[0].z = screen_2d_z;
 	vs[0].u = (uv_offset.x) * rpw;
 	vs[0].v = (uv_offset.y) * rph;
-	vs[0].argb = lcol;
+	vs[0].argb = tilecol;
 	vs[0].oargb = 0;
 
 //	vs[1].flags = PVR_CMD_VERTEX;
@@ -1619,7 +1671,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[1].z = screen_2d_z;
 	vs[1].u = (uv_offset.x + uv_size.x) * rpw;
 	vs[1].v = (uv_offset.y) * rph;
-	vs[1].argb = lcol;
+	vs[1].argb = tilecol;
 //	vs[1].oargb = 0;
 
 	vs[2].flags = PVR_CMD_VERTEX;
@@ -1628,7 +1680,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[2].z = screen_2d_z;
 	vs[2].u = (uv_offset.x) * rpw;
 	vs[2].v = (uv_offset.y + uv_size.y) * rph;
-	vs[2].argb = lcol;
+	vs[2].argb = tilecol;
 //	vs[2].oargb = 0;
 
 	vs[3].flags = PVR_CMD_VERTEX_EOL;
@@ -1637,7 +1689,7 @@ void render_push_2d_tile(vec2i_t pos, vec2i_t uv_offset, vec2i_t uv_size, vec2i_
 	vs[3].z = screen_2d_z;
 	vs[3].u = (uv_offset.x + uv_size.x) * rpw;
 	vs[3].v = (uv_offset.y + uv_size.y) * rph;
-	vs[3].argb = lcol;
+	vs[3].argb = tilecol;
 //	vs[3].oargb = 0;
 
 	render_quad(texture_index);
@@ -1693,19 +1745,44 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 				textures[texture_index] = (render_texture_t){ {wp2, hp2}, {tw, th} };
 
 				if (!is_sky)  {
-				// copy source texture into larger pow2-padded texture
+					// copy source texture into larger pow2-padded texture
 					for (uint32_t y = 0; y < th; y++)
 						for(uint32_t x = 0; x < tw; x++)
 							tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
+					// pad horizontal space with repeated texture columns
+					for (uint32_t y = 0; y < th; y++)
+						for (uint32_t x = tw; x < wp2; x++)
+							tmpstore[(y*wp2) + x] = tmpstore[(y*wp2) + (x-tw)];
+					// pad vertical space with repeated texture rows
+					for (uint32_t y = th; y < hp2; y++)
+						for (uint32_t x = 0; x < wp2; x++)
+							tmpstore[(y*wp2) + x] = tmpstore[((y-th)*wp2) + x];
 				} else {
 					// copy source texture into larger pow2-padded texture
 					for (uint32_t y = 0; y < th; y++)
 						for(uint32_t x = 0; x < tw; x++)
 							tmpstore[(y*wp2) + x] = pixels[(y*tw) + x];
 
-					// for sky texture, copy first source column over last source column
+					// move some columns over and copy some
+					// this mostly gets filtered skies to match unfiltered
+					// Rapier Karbonis still has lines. those are present on PSX also
 					for (uint32_t y = 0; y < th; y++)
-						tmpstore[(y*wp2)+(tw-1)] = pixels[(y*tw)];
+						tmpstore[(y*wp2)+4] = tmpstore[(y*wp2)+3];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+3] = tmpstore[(y*wp2)+2];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+2] = tmpstore[(y*wp2)+1];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+1] = tmpstore[(y*wp2)];
+
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+(tw-4)] = tmpstore[(y*wp2)+(tw-3)];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+(tw-3)] = tmpstore[(y*wp2)+(tw-2)];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+(tw-2)] = tmpstore[(y*wp2)+1];
+					for (uint32_t y = 0; y < th; y++)
+						tmpstore[(y*wp2)+(tw-1)] = tmpstore[(y*wp2)];
 				}
 
 				pvr_txr_load_ex(tmpstore, ptrs[texture_index], wp2, hp2, PVR_TXRLOAD_16BPP);
