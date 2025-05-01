@@ -769,7 +769,7 @@ void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 
 			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
 			w4 = wout;
-			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
@@ -1205,7 +1205,7 @@ void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, floa
 
 			nearz_clip(&vs[2], &vs[3], &vs[4], w2, w3);
 			w4 = wout;
-			nearz_clip(&vs[1], &vs[2], &vs[2], w1, w2);
+			nearz_clip(&vs[0], &vs[2], &vs[2], w0, w2);
 			w2 = wout;
 
 			vs[3].flags = PVR_CMD_VERTEX;
