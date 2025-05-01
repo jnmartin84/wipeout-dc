@@ -9,11 +9,13 @@ https://github.com/phoboslab/wipeout-rewrite
 ***
 
 ***
-This is the third bug-fix release for v2. Extended draw distance, 16:9 anamorphic widescreen available,
+This is the fourth bug-fix release for v2. 
 
-reimplemented screen shake, many bug-fixes for collision behavior, sound, target lockon indicator, more.
+Current feature set includes: Extended draw distance, 16:9 anamorphic widescreen available,
 
-Feature complete, almost 100% 60 FPS (100% is a strong guarantee), music and sound,
+reimplemented screen shake, restored PSX-original collision behavior, more.
+
+Feature complete, almost 100% 60 FPS (100% is a strong guarantee), full music and sound,
 
 VMU save/load for settings and high scores (6 blocks required), full input remapping support for Dreamcast controller.
 ***
@@ -23,7 +25,7 @@ VMU save/load for settings and high scores (6 blocks required), full input remap
 ***
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI`.
 
-https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.3
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.4
 
 Note that playing in emulation is not supported. If you run into trouble and need a solution, buy a Dreamcast.
 
