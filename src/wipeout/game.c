@@ -195,7 +195,6 @@ const game_def_t def = {
 			"JNMARTIN84",
 			"MRNEO240",
 		"#THIRD PARTY CODE",
-			"SKMP",
 			"KAZADE",
 			"FALCO GIRGIS",
 			"BBHOODSTA",
