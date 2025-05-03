@@ -239,6 +239,9 @@ static void update_header(uint16_t texture_index) {
 		else if (render_state.blend_mode == RENDER_BLEND_SPECIAL2) {
 			header2 |= (PVR_BLEND_ONE << PVR_TA_PM2_SRCBLEND_SHIFT) | (PVR_BLEND_ONE << PVR_TA_PM2_DSTBLEND_SHIFT);
 		}
+		else if (render_state.blend_mode == RENDER_BLEND_BRIGHTBRIGHT) {
+			header2 |= (PVR_BLEND_ONE << PVR_TA_PM2_SRCBLEND_SHIFT) | (PVR_BLEND_INVSRCALPHA << PVR_TA_PM2_DSTBLEND_SHIFT);
+		}
 
 		hp[1] = header1;
 		hp[2] = header2;
@@ -266,6 +269,8 @@ void compile_header(uint16_t texture_index) {
 		}
 
 		ccxt.gen.specular = PVR_SPECULAR_ENABLE;
+		//if (render_state.load_OP)
+		//	ccxt.txr.env = PVR_TXRENV_DECAL;
 		ccxt.depth.write = PVR_DEPTHWRITE_DISABLE;
 		ccxt.depth.comparison = PVR_DEPTHCMP_NEVER;
 		pvr_poly_compile(chdr[texture_index][1], &ccxt);
@@ -339,18 +344,6 @@ void render_reset_proj(float farval) {
 
 	vp_mat.m[10] = f1;
 	vp_mat.m[14] = f2;
-}
-
-void render_set_fov(float angle) {
-	float aspect = (float)screen_size.x / (float)screen_size.y;
-	float fov = (angle / 180.0f) * F_PI;
-	float f = 1.0f / tanf(fov * 0.5f);
-
-	projection_mat.m[0] = f / aspect;
-	projection_mat.m[5] = f;
-
-	vp_mat.m[0] = f / aspect;
-	vp_mat.m[5] = f;
 }
 
 void render_set_screen_size(vec2i_t size) {
@@ -1425,7 +1418,15 @@ tri_sendit:
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
-	render_set_blend_mode(RENDER_BLEND_NORMAL);
+//	render_set_blend_mode(RENDER_BLEND_NORMAL);
+	if ((vs[0].argb & 0xff000000) < 0xff000000) {
+		if ((vs[0].argb & 0xff000000) != 0x60000000)
+			render_set_blend_mode(RENDER_BLEND_BRIGHTBRIGHT);
+		else
+			render_set_blend_mode(RENDER_BLEND_NORMAL);
+	} else {
+		render_set_blend_mode(RENDER_BLEND_NORMAL);
+	}
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
@@ -1557,7 +1558,15 @@ void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index
 	perspdiv(&vs[1], w1);
 	perspdiv(&vs[2], w2);
 
-	render_set_blend_mode(RENDER_BLEND_NORMAL);
+//	render_set_blend_mode(RENDER_BLEND_NORMAL);
+	if ((vs[0].argb & 0xff000000) < 0xff000000) {
+		if ((vs[0].argb & 0xff000000) != 0x60000000)
+			render_set_blend_mode(RENDER_BLEND_BRIGHTBRIGHT);
+		else
+			render_set_blend_mode(RENDER_BLEND_NORMAL);
+	} else {
+		render_set_blend_mode(RENDER_BLEND_NORMAL);
+	}
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
 		render_state.last_index = texture_index;

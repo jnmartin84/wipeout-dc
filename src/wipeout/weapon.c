@@ -549,7 +549,7 @@ void weapon_update_shield(weapon_t *self) {
 	int primitives_len = self->model->primitives_len;
 	uint8_t col0, col1, col2, col3;
 	int16_t *coords;
-	uint8_t shield_alpha = 48;
+	uint8_t shield_alpha = 96;
 #define packcola(rr,gg,bb,aa) (((aa) << 24) | ((rr) << 16) | ((gg) << 8) | (bb))
 	// FIXME: this looks kinda close to the PSX original!?
 	float color_timer = self->timer * 0.05;

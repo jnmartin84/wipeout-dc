@@ -16,6 +16,14 @@
 #include <dc/vmu_fb.h>
 #include <dc/vmu_pkg.h>
 
+#include <kos.h>
+#include <dc/maple.h>
+#include <dc/maple/controller.h>
+#include <dc/vmu_fb.h>
+#include <dc/vmu_pkg.h>
+
+uint16_t old_buttons = 0, rel_buttons = 0;
+
 extern uint8_t allow_exit;
 static volatile int wants_to_exit = 0;
 void *gamepad;
@@ -38,8 +46,6 @@ int if_to_await = 0;
 
 #define configDeadzone (0x04)
 
-uint16_t old_buttons = 0, rel_buttons = 0;
-
 void platform_pump_events()
 {
 	maple_device_t *cont;
@@ -51,6 +57,14 @@ void platform_pump_events()
 	state = (cont_state_t *)maple_dev_status(cont);
 
  	rel_buttons = (old_buttons ^ state->buttons);
+
+#if 0
+	if (state->ltrig && state->rtrig) {
+		char ssfn[256];
+		sprintf(ssfn, "/pc/race_%d_%d.pnm", g.race_class, g.circut);
+		vid_screen_shot(ssfn);
+	}
+#endif
 
 	if ((state->buttons & CONT_START) && state->ltrig && state->rtrig)
 		platform_exit();
@@ -361,8 +375,6 @@ rgba_t *platform_get_screenbuffer(int32_t *pitch) {
 vec2i_t platform_screen_size(void) {
 	return screen_size;
 }
-
-#include <kos.h>
 
 int main(int argc, char *argv[]) {
 	// Figure out the absolute asset and userdata paths. These may either be

@@ -337,7 +337,7 @@ void ship_init_exhaust_plume(ship_t *self) {
 
 				// what I set it to:
 				// clamped(original color * 2) with original alpha
-				prm.ft3->color = 0x8cffc2f0;
+				prm.ft3->color = 0x8cffc800;//0x8cffc2f0;
 				prm.ft3->pad1 = 1;
 			}
 			prm.ft3 += 1;
@@ -380,7 +380,7 @@ void ship_init_exhaust_plume(ship_t *self) {
 
 					// what I set it to:
 					// clamped(original color * 2) with original alpha
-					prm.gt3->color[j] = 0x8cffc2f0;
+					prm.gt3->color[j] = 0x8cffc800;
 				}
 				prm.gt3->pad1 = 1;
 			}

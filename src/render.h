@@ -9,6 +9,7 @@ typedef enum {
 	RENDER_BLEND_SPECIAL,
 	RENDER_BLEND_STUPID,
 	RENDER_BLEND_SPECIAL2,
+	RENDER_BLEND_BRIGHTBRIGHT,
 } render_blend_mode_t;
 
 typedef enum {
@@ -64,7 +65,6 @@ void render_cleanup(void);
 vec2i_t render_res_to_size(render_resolution_t res);
 void render_reset_proj(float farval);
 void render_set_screen_size(vec2i_t size);
-void render_set_fov(float angle);
 void render_set_resolution(render_resolution_t res);
 void render_set_post_effect(render_post_effect_t post);
 vec2i_t render_size(void);
