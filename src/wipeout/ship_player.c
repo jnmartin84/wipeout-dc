@@ -170,6 +170,10 @@ void ship_player_update_intro_general(ship_t *self) {
 
 void ship_player_update_race(ship_t *self) {
 	if (flags_not(self->flags, SHIP_RACING)) {
+		// shield sfx was playing indefinitely after race
+		self->sfx_shield->volume = 0;
+		sfx_update_ex(self->sfx_shield);
+
 		self->update_func = ship_ai_update_race;
 		return;
 	}
