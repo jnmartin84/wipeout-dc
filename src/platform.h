@@ -15,8 +15,5 @@ uint8_t *platform_load_asset(const char *name, uint32_t *bytes_read);
 uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read);
 uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len);
 
-#if defined(RENDERER_SOFTWARE)
-	rgba_t *platform_get_screenbuffer(int32_t *pitch);
-#endif
 
 #endif

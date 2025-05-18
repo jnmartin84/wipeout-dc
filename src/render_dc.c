@@ -20,7 +20,6 @@
 #include "mem.h"
 #include "utils.h"
 #include "wipeout/game.h"
-
 #include <kos.h>
 #include "alloc.h"
 
@@ -168,6 +167,7 @@ vec2i_t screen_size;
 
 static mat4_t __attribute__((aligned(32))) projection_mat = mat4_identity();
 static mat4_t __attribute__((aligned(32))) sprite_mat = mat4_identity();
+mat4_t __attribute__((aligned(32))) storemat = mat4_identity();
 mat4_t __attribute__((aligned(32))) view_mat = mat4_identity();
 mat4_t __attribute__((aligned(32))) mvp_mat = mat4_identity();
 mat4_t __attribute__((aligned(32))) vp_mat;
@@ -269,8 +269,17 @@ void compile_header(uint16_t texture_index) {
 		}
 
 		ccxt.gen.specular = PVR_SPECULAR_ENABLE;
-		//if (render_state.load_OP)
-		//	ccxt.txr.env = PVR_TXRENV_DECAL;
+//		// rapier silverstream uses vertex coloring for aurora, everything else doesn't need it and can be DECAL
+		if (render_state.load_OP) { //&& !((g.race_class == RACE_CLASS_RAPIER) && g.circut == CIRCUT_SILVERSTREAM))
+			if (g.race_class == RACE_CLASS_VENOM) {
+				if (g.circut == CIRCUT_TERRAMAX || g.circut == CIRCUT_ARRIDOS_IV) {
+					ccxt.txr.env = PVR_TXRENV_DECAL;
+				}
+			}
+		}
+//			ccxt.txr.env = PVR_TXRENV_DECAL;
+//		else if (render_state.load_OP && ((g.race_class == RACE_CLASS_RAPIER) && g.circut == CIRCUT_SILVERSTREAM))
+//			ccxt.txr.env = PVR_TXRENV_MODULATE;
 		ccxt.depth.write = PVR_DEPTHWRITE_DISABLE;
 		ccxt.depth.comparison = PVR_DEPTHCMP_NEVER;
 		pvr_poly_compile(chdr[texture_index][1], &ccxt);
@@ -418,11 +427,6 @@ void render_set_view(vec3_t pos, vec3_t angles) {
 	mat4_set_roll_pitch_yaw(&view_mat, vec3(angles.x, -angles.y + F_PI, angles.z + F_PI));
 	mat4_translate(&view_mat, vec3_inv(pos));
 	mat4_set_yaw_pitch_roll(&sprite_mat, vec3(-angles.x, angles.y - F_PI, 0));
-/* 	for (int i=0;i<4;i++) {
-		for (int j=0;j<4;j++) {
-			rot_sprite_mat.cols[i][j] = sprite_mat.cols[j][i];
-		}
-	} */
 }
 
 void render_set_view_2d(void) {
@@ -591,6 +595,7 @@ void render_hud_quad(uint16_t texture_index) {
 
 	pvr_prim(&vs[0], sizeof(pvr_vertex_t) * 4);
 }
+
 
 void  __attribute__((noinline)) render_quad(uint16_t texture_index) {
 	// ((vs[0].z >= -w0) | ((vs[1].z >= -w1) << 1) | ((vs[2].z >= -w2) << 2) | ((vs[3].z >= -w3) << 3))
@@ -1004,6 +1009,7 @@ tri_sendit:
 
 	// don't do anything header-related if we're on the same texture or render mode as the last call
 	render_set_blend_mode(RENDER_BLEND_NORMAL);
+
 	if (render_state.last_index != texture_index || render_state.cur_mode != last_mode[texture_index]) {
 		// ^-- both of these need to be checked at top level, not one with one nested
 		render_state.last_index = texture_index;
@@ -1520,7 +1526,6 @@ void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index
 	pvr_prim(vs, 128);
 }
 
-
 void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index, float *w) {
 	float w0,w1,w2;
  	uint8_t cl0, cl1, cl2;
@@ -1594,20 +1599,20 @@ void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index
 void  __attribute__((noinline)) render_push_sprite(vec3_t pos, vec2i_t size, uint32_t lcol, uint16_t texture_index) {
 	screen_2d_z += 0.0005f;
 
-/* 	fast_mat_store(&storemat.cols);
-	fast_mat_load(&rot_sprite_mat.cols); */
+ 	fast_mat_store(&storemat.cols);
+	fast_mat_load(&sprite_mat.cols);
 
 	// this ordering fixes the drawing of sprites without disabling culling
-	vec3_t t1 = vec3_transform(vec3( size.x * 0.5f, -size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
-	vec3_t t2 = vec3_transform(vec3(-size.x * 0.5f, -size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
-	vec3_t t3 = vec3_transform(vec3( size.x * 0.5f,  size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
-	vec3_t t4 = vec3_transform(vec3(-size.x * 0.5f,  size.y * 0.5f, screen_2d_z), /* &rot_ */&sprite_mat);
+	vec3_t t1 = vec3_transform(vec3( size.x * 0.5f, -size.y * 0.5f, screen_2d_z));
+	vec3_t t2 = vec3_transform(vec3(-size.x * 0.5f, -size.y * 0.5f, screen_2d_z));
+	vec3_t t3 = vec3_transform(vec3( size.x * 0.5f,  size.y * 0.5f, screen_2d_z));
+	vec3_t t4 = vec3_transform(vec3(-size.x * 0.5f,  size.y * 0.5f, screen_2d_z));
 	vec3_t p1 = vec3_add(pos, t1);
 	vec3_t p2 = vec3_add(pos, t2);
 	vec3_t p3 = vec3_add(pos, t3);
 	vec3_t p4 = vec3_add(pos, t4);
 
-/* 	fast_mat_load(&storemat.cols); */
+	fast_mat_load(&storemat.cols);
 
 	render_texture_t *t = &textures[texture_index];
 	float rpw = approx_recip(t->offset.x);
@@ -1718,7 +1723,11 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 		if (tw == 0 || th == 0) {
 			// this is the ring and something else possibly on the stopwatch model
 			// 0x1 texture
-			goto createbail;
+			tw = 8;
+			th = 8;
+			goto theelse;
+//
+//			goto createbail;
 		} else {
 			if (g.race_class == RACE_CLASS_VENOM && g.circut == CIRCUT_TERRAMAX && texture_index == 0x88) {
 				uint32_t dcpad_size;
@@ -1733,6 +1742,7 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 				pvr_txr_load(objdata, ptrs[texture_index], 128*64*2);
 				mem_temp_free(objdata);
 			} else {
+theelse:
 				uint16_t *tmpstore = (uint16_t *)mem_temp_alloc(sizeof(uint16_t)*wp2*hp2);
 
 				// there's something weird with textures of the bottom of the right wing of every ship
@@ -1742,8 +1752,8 @@ uint16_t render_texture_create(uint32_t tw, uint32_t th, uint16_t *pixels) {
 				for (int i = 0; i < wp2 * hp2; i++) {
 					if (texture_index == 0x21)
 						tmpstore[i] = 0xBDEF;
-						else
-							tmpstore[i] = 0;
+					else
+						tmpstore[i] = 0;
 				}
 
 				ptrs[texture_index] = alloc_malloc(NULL, wp2 * hp2 * 2);

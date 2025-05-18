@@ -85,12 +85,12 @@ void render_set_cull_backface(bool enabled);
 
 void render_hud_quad(uint16_t texture);
 
-void  __attribute__((noinline)) render_quad(uint16_t texture);
-void  __attribute__((noinline)) render_tri(uint16_t texture);
-void  __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, float *w);
-void  __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float *w);
-void  __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index, float *w);
-void  __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index, float *w);
+void __attribute__((noinline)) render_quad(uint16_t texture);
+void __attribute__((noinline)) render_tri(uint16_t texture);
+void __attribute__((noinline)) render_quad_noxform(uint16_t texture_index, float *w);
+void __attribute__((noinline)) render_tri_noxform(uint16_t texture_index, float *w);
+void __attribute__((noinline)) render_quad_noxform_noclip(uint16_t texture_index, float *w);
+void __attribute__((noinline)) render_tri_noxform_noclip(uint16_t texture_index, float *w);
 
 void  __attribute__((noinline)) render_push_sprite(vec3_t pos, vec2i_t size, uint32_t color, uint16_t texture);
 void render_push_2d(vec2i_t pos, vec2i_t size, rgba_t color, uint16_t texture);

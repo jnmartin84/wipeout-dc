@@ -45,6 +45,7 @@ extern pvr_vertex_t vs[5];
 extern void memcpy32(const void *dst, const void *src, size_t s);
 
 #define DCPAD_NUM_FACES 3021
+
 pvr_vertex_t *model_faces;
 static mat4_t __attribute__((aligned(32))) mat;
 
@@ -56,7 +57,7 @@ static void draw_controller(vec2_t offset, vec3_t pos, float rotation) {
 	mat.cols[0][0] = mat.cols[1][1] = mat.cols[2][2] = mat.cols[3][3] = 1.0f;
 
 	mat4_set_translation(&mat, pos);
-	mat4_set_yaw_pitch_roll(&mat, vec3(0, rotation, F_PI));	
+	mat4_set_yaw_pitch_roll(&mat, vec3(0, rotation, F_PI));
 
 	render_set_model_mat(&mat);
 
@@ -64,7 +65,6 @@ static void draw_controller(vec2_t offset, vec3_t pos, float rotation) {
 
 	for (int i=0;i<DCPAD_NUM_FACES;i++) {
 		memcpy32(vs, &model_faces[(i<<2)], 128);
-
 		if (vs[3].flags == 0)
 			render_tri(RENDER_NO_TEXTURE);
 		else
@@ -91,7 +91,7 @@ static void draw_model(Object *model, vec2_t offset, vec3_t pos, float rotation)
 
 
 // -----------------------------------------------------------------------------
-// Main Menu
+// Main 
 
 static void button_start_game(menu_t *menu, int data) {
 	page_race_class_init(menu);
@@ -103,8 +103,8 @@ static void button_options(menu_t *menu, int data) {
 
 static void page_main_draw(menu_t *menu, int data) {
 	switch (data) {
-		case 0: draw_model(g.ships[0].model, vec2(0, -0.1), vec3(0, 0, -700), system_cycle_time()); break;
-		case 1: draw_model(models.misc.options, vec2(0, -0.2), vec3(0, 0, -700), system_cycle_time()); break;
+		case 0: draw_model(g.ships[0].model, vec2(0, -0.1), vec3(0, 0, -700), 0.333f * system_cycle_time()); break;
+		case 1: draw_model(models.misc.options, vec2(0, -0.2), vec3(0, 0, -700), -2.0f * system_cycle_time()); break;
 		case 2: draw_model(models.misc.msdos, vec2(0, -0.2), vec3(0, 0, -700), system_cycle_time()); break;
 	}
 }
@@ -153,10 +153,10 @@ static void button_bonus(menu_t *menu, int data) {
 
 static void page_options_draw(menu_t *menu, int data) {
 	switch (data) {
-		case 0: draw_controller(vec2(0, -0.1), vec3(0, 0, -250), system_cycle_time()); break;
-		case 1: draw_model(models.rescue, vec2(0, -0.2), vec3(0, 0, -700), system_cycle_time()); break; // TODO: needs better model
-		case 2: draw_model(models.options.headphones, vec2(0, -0.2), vec3(0, 0, -300), system_cycle_time()); break;
-		case 3: draw_model(models.options.stopwatch, vec2(0, -0.2), vec3(0, 0, -400), system_cycle_time()); break;
+		case 0: draw_controller(vec2(0, -0.1), vec3(0, 0, -250), -2.0f * system_cycle_time()); break;
+		case 1: draw_model(models.rescue, vec2(0, -0.2), vec3(0, 0, -700), -2.0f * system_cycle_time()); break; // TODO: needs better model
+		case 2: draw_model(models.options.headphones, vec2(0, -0.2), vec3(0, 0, -300), -2.0f * system_cycle_time()); break;
+		case 3: draw_model(models.options.stopwatch, vec2(0, -0.2), vec3(0, 0, -400), -2.0f * system_cycle_time()); break;
 		default: break;
 	}
 }
@@ -684,9 +684,9 @@ static void button_team_select(menu_t *menu, int data) {
 
 static void page_team_draw(menu_t *menu, int data) {
 	int team_model_index = (data + 3) % 4; // models in the prm are shifted by -1
-	draw_model(models.teams[team_model_index], vec2(0, -0.2), vec3(0, 0, -10000), system_cycle_time());
-	draw_model(g.ships[def.teams[data].pilots[0]].model, vec2(0, -0.3), vec3(-700, -800, -1300), system_cycle_time()*1.1);
-	draw_model(g.ships[def.teams[data].pilots[1]].model, vec2(0, -0.3), vec3( 700, -800, -1300), system_cycle_time()*1.2);
+	draw_model(models.teams[team_model_index], vec2(0, -0.2), vec3(0, 50, -10000), system_cycle_time());
+	draw_model(g.ships[def.teams[data].pilots[0]].model, vec2(0, -0.3), vec3(-700, -550, -1300), system_cycle_time()*1.1);
+	draw_model(g.ships[def.teams[data].pilots[1]].model, vec2(0, -0.3), vec3( 700, -550, -1300), system_cycle_time()*1.2);
 }
 
 static void page_team_init(menu_t *menu) {
@@ -770,7 +770,6 @@ static void page_circut_draw(menu_t *menu, int data) {
 			scaled_size.x = 160;
 			scaled_size.y = 93;
 		} else {
-			//scaled_size = size;
 			scaled_size.x = 320;
 			scaled_size.y = 186;
 		}
@@ -834,6 +833,7 @@ static void objects_unpack_imp(Object **dest_array, int len, Object *src) {
 
 extern global_render_state_t render_state;
 extern volatile uint32_t last_five_tracks[5];
+
 void main_menu_init(void) {
 	render_state.in_menu = 1;
 	g.is_attract_mode = false;
@@ -876,8 +876,9 @@ void main_menu_init(void) {
 	page_main_init(main_menu);
 
 	// don't play music until everything is loaded from disc
+
 	sfx_music_mode(SFX_MUSIC_RANDOM);
-//	sfx_music_play(rand_int(0, len(def.music)));
+
 	uint32_t new_index = rand_int(0, len(def.music));
 
 	int try_again = 0;

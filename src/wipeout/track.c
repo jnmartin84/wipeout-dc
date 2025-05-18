@@ -604,7 +604,7 @@ void track_draw(camera_t *camera) {
 		section_t *s = &g.track.sections[i];
 		vec3_t diff = vec3_sub(cam_pos, s->center);
 		float cam_dot = vec3_dot(diff, cam_dir);
-		float dist_sq = vec3_dot(diff, diff);
+		float dist_sq = vec_fipr(diff);
 
 		if (cam_dot < s->radius &&
 			dist_sq < drawdist
@@ -651,7 +651,7 @@ track_face_t *track_section_get_base_face(section_t *section) {
 	return section->base_face;
 }
 
-section_t *track_nearest_section(vec3_t pos, vec3_t bias, section_t *section, float *distance) {
+section_t *track_nearest_section(vec3_t pos, section_t *section, float *distance) {
 	// Start search several sections before current section
 
 	for (int i = 0; i < TRACK_SEARCH_LOOK_BACK; i++) {
@@ -671,7 +671,7 @@ section_t *track_nearest_section(vec3_t pos, vec3_t bias, section_t *section, fl
 		// Some callers of this function want to de-emphazise the .y component
 		// of the difference, hence the multiplication with the bias vector.
 		// For the real, exact difference bias should be vec3(1,1,1)
-		float d = vec3_len(vec3_mul(vec3_sub(pos, section->center), bias));
+		float d = vec3_len(vec3_sub(pos, section->center));
 		if (d < shortest_distance) {
 			shortest_distance = d;
 			nearest_section = section;
@@ -683,7 +683,65 @@ section_t *track_nearest_section(vec3_t pos, vec3_t bias, section_t *section, fl
 	if (junction) {
 		section = junction;
 		for (int i = 0; i < TRACK_SEARCH_LOOK_AHEAD; i++) {
-			float d = vec3_len(vec3_mul(vec3_sub(pos, section->center), bias));
+			float d = vec3_len(vec3_sub(pos, section->center));
+			if (d < shortest_distance) {
+				shortest_distance = d;
+				nearest_section = section;
+			}
+
+			if (flags_is(junction->flags, SECTION_JUNCTION_START)) {
+				section = section->next;
+			}
+			else {
+				section = section->prev;
+			}
+		}
+	}
+
+	if (distance != NULL) {
+		*distance = shortest_distance;
+	}
+	return nearest_section;
+}
+
+
+section_t *track_nearest_section_qy(vec3_t pos, section_t *section, float *distance) {
+	// Start search several sections before current section
+
+	for (int i = 0; i < TRACK_SEARCH_LOOK_BACK; i++) {
+		section = section->prev;
+	}
+
+	// Find vector from ship center to track section under
+	// consideration
+	float shortest_distance = 1000000000.0;
+	section_t *nearest_section = section;
+	section_t *junction = NULL;
+	for (int i = 0; i < TRACK_SEARCH_LOOK_AHEAD; i++) {
+		if (section->junction) {
+			junction = section->junction;
+		}
+
+		// Some callers of this function want to de-emphazise the .y component
+		// of the difference, hence the multiplication with the bias vector.
+		// For the real, exact difference bias should be vec3(1,1,1)
+		vec3_t possubcenter = vec3_sub(pos, section->center);
+		possubcenter.y *= 0.25f;
+		float d = vec3_len(possubcenter);
+		if (d < shortest_distance) {
+			shortest_distance = d;
+			nearest_section = section;
+		}
+
+		section = section->next;
+	}
+
+	if (junction) {
+		section = junction;
+		for (int i = 0; i < TRACK_SEARCH_LOOK_AHEAD; i++) {
+			vec3_t possubcenter = vec3_sub(pos, section->center);
+			possubcenter.y *= 0.25f;
+			float d = vec3_len(possubcenter);
 			if (d < shortest_distance) {
 				shortest_distance = d;
 				nearest_section = section;

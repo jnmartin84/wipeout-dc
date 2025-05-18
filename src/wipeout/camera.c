@@ -34,25 +34,26 @@ vec3_t camera_forward(camera_t *camera) {
 }
 
 void camera_update(camera_t *camera, ship_t *ship, droid_t *droid) {
+	float reciptick = approx_recip(system_tick());
 	camera->last_position = camera->position;
 	(camera->update_func)(camera, ship, droid);
-	camera->real_velocity = vec3_mulf(vec3_sub(camera->position, camera->last_position), 1.0/system_tick());
+	camera->real_velocity = vec3_mulf(vec3_sub(camera->position, camera->last_position), reciptick);
 }
 
 void camera_update_race_external(camera_t *camera, ship_t *ship, droid_t *droid) {
 	vec3_t pos = vec3_sub(ship->position, vec3_mulf(ship->dir_forward, 1024));
 	pos.y -= 200;
-	camera->section = track_nearest_section(pos, vec3(1,1,1), camera->section, NULL);
+	camera->section = track_nearest_section(pos, /* vec3(1,1,1),  */camera->section, NULL);
 	section_t *next = camera->section->next;
 
 	vec3_t target = vec3_project_to_ray(pos, next->center, camera->section->center);
 
 	vec3_t diff_from_center = vec3_sub(pos, target);
 	vec3_t acc = diff_from_center;
-	acc.y += vec3_len(diff_from_center) * 15.0f/16.0f; // was ` * 0.5f`
-
-	camera->velocity = vec3_sub(camera->velocity, vec3_mulf(acc, 0.015625f * 30 * system_tick()));
-	camera->velocity = vec3_sub(camera->velocity, vec3_mulf(camera->velocity, 0.125f * 30 * system_tick()));
+	acc.y += vec3_len(diff_from_center) * 0.9375f;/* 15.0f/16.0f */ // was ` * 0.5f`
+	float tick30 = 30.0f * system_tick();
+	camera->velocity = vec3_sub(camera->velocity, vec3_mulf(acc, 0.015625f * tick30));
+	camera->velocity = vec3_sub(camera->velocity, vec3_mulf(camera->velocity, 0.125f * tick30));
 	pos = vec3_add(pos, camera->velocity);
 
 	camera->position = pos;
@@ -78,12 +79,12 @@ void camera_update_race_intro(camera_t *camera, ship_t *ship, droid_t *droid) {
 		camera->has_initial_section = true;
 	}
 	else {
-		camera->section = track_nearest_section(pos, vec3(1,1,1), camera->section, NULL);
+		camera->section = track_nearest_section(pos, camera->section, NULL);
 	}
 
 	camera->position = pos;
-	camera->angle.z = 0;
-	camera->angle.x = ship->angle.x * 0.5;
+	camera->angle.z = 0.0f;
+	camera->angle.x = ship->angle.x * 0.5f;
 	vec3_t target = vec3_sub(ship->position, pos);
 
 	camera->angle.y = -bump_atan2f(target.x, target.z);
@@ -122,7 +123,7 @@ void camera_update_rescue(camera_t *camera, ship_t *ship, droid_t *droid) {
 	camera->position = vec3_add(camera->section->center, vec3(300, -1500, 300));
 
 	vec3_t target = vec3_sub(droid->position, camera->position);
-	float height = sqrtf(target.x * target.x + target.z * target.z);
+	float height = sqrtf((target.x * target.x) + (target.z * target.z));
 	camera->angle.x = -bump_atan2f(target.y, height);
 	camera->angle.y = -bump_atan2f(target.x, target.z);
 }
@@ -145,7 +146,7 @@ void camera_update_static_follow(camera_t *camera, ship_t *ship, droid_t *droid)
 	}
 
 	vec3_t target = vec3_sub(ship->position, camera->position);
-	float height = sqrtf(target.x * target.x + target.z * target.z);
+	float height = sqrtf((target.x * target.x) + (target.z * target.z));
 	camera->angle.x = -bump_atan2f(target.y, height);
 	camera->angle.y = -bump_atan2f(target.x, target.z);
 }

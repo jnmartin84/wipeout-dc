@@ -98,18 +98,22 @@ void droid_draw(droid_t *droid) {
 }
 
 void droid_update(droid_t *droid, ship_t *ship) {
+	float tick = system_tick();
 	(droid->update_func)(droid, ship);
 
-	droid->velocity = vec3_add(droid->velocity, vec3_mulf(droid->acceleration, 30 * system_tick()));
-	droid->velocity = vec3_sub(droid->velocity, vec3_mulf(droid->velocity, 0.125 * 30 * system_tick()));
-	droid->position = vec3_add(droid->position, vec3_mulf(droid->velocity, 0.015625 * 30 * system_tick()));
-	droid->angle = vec3_add(droid->angle, vec3_mulf(droid->angular_velocity, system_tick()));
+	droid->velocity = vec3_add(droid->velocity, vec3_mulf(droid->acceleration, 30.0f * tick));//system_tick()));
+	droid->velocity = vec3_sub(droid->velocity, vec3_mulf(droid->velocity, 3.75f * tick/* 0.125 * 30 * system_tick() */));
+	droid->position = vec3_add(droid->position, vec3_mulf(droid->velocity, 0.46875f * tick/* 0.015625 * 30 * system_tick() */));
+	droid->angle = vec3_add(droid->angle, vec3_mulf(droid->angular_velocity, tick/* system_tick() */));
 	droid->angle = vec3_wrap_angle(droid->angle);
 	
-	if (flags_is(droid->sfx_tractor->flags, SFX_PLAY)) {
-		sfx_set_position(droid->sfx_tractor, droid->position, droid->velocity, 0.5);
-	}
+	float tractor_vol = flags_is(droid->sfx_tractor->flags, SFX_PLAY) ? 0.5f : 0.0f;
+
+//	if (flags_is(droid->sfx_tractor->flags, SFX_PLAY)) {
+	sfx_set_position(droid->sfx_tractor, droid->position, droid->velocity, tractor_vol);
+//	}
 }
+
 
 void droid_update_intro(droid_t *droid, ship_t *ship) {
 	droid->update_timer -= system_tick();

@@ -9,6 +9,7 @@
 #define MAXINT ((int)0x7fffffff) /* max pos 32-bit int */
 #define MININT ((int)0x80000000) /* max negative 32-bit integer */
 #define recip255 0.0039215688593685626983642578125f
+
 static uint32_t LightGetHSV(uint8_t r, uint8_t g, uint8_t b) {
 	uint8_t h_, s_, v_;
 	int min;
@@ -167,6 +168,42 @@ static uint32_t LightGetRGB(uint8_t h, uint8_t s, uint8_t v) {
 	return (((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff));
 }
 
+uint32_t argb_from_u32_alpha(uint32_t v, uint8_t a) {
+	float l_flt;
+	int factor;
+	int h, s, _v;
+	int hsv;
+	uint8_t vr,vg,vb;
+
+	vr = ((v >> 24) & 0xff);
+	vg = ((v >> 16) & 0xff);
+	vb = ((v >> 8) & 0xff);
+
+ 	hsv = LightGetHSV(vr, vg, vb);
+
+	h = (hsv >> 16) & 0xFF;
+	s = (hsv >> 8) & 0xFF;
+	_v = hsv & 0xFF;
+
+	factor = _v;
+
+	l_flt = (float)factor * 2.2f;
+
+	_v = (int)l_flt;
+
+	if (_v < 0)
+		_v = 0;
+	if (_v > 255)
+		_v = 255;
+
+	int rgb = LightGetRGB(h, s, _v);
+	return (a << 24) | (rgb & 0x00ffffff);
+}
+
+uint32_t notex_argb_from_u32(uint32_t v) {
+	return 0xff000000 | ((v >> 8)&0x00ffffff);
+}
+
 uint32_t argb_from_u32(uint32_t v) {
 	float l_flt;
 	int factor;
@@ -177,6 +214,38 @@ uint32_t argb_from_u32(uint32_t v) {
 	vr = ((v >> 24) & 0xff);
 	vg = ((v >> 16) & 0xff);
 	vb = ((v >> 8) & 0xff);
+
+ 	hsv = LightGetHSV(vr, vg, vb);
+
+	h = (hsv >> 16) & 0xFF;
+	s = (hsv >> 8) & 0xFF;
+	_v = hsv & 0xFF;
+
+	factor = _v;
+
+	l_flt = (float)factor * 2.2f;
+
+	_v = (int)l_flt;
+
+	if (_v < 0)
+		_v = 0;
+	if (_v > 255)
+		_v = 255;
+
+	int rgb = LightGetRGB(h, s, _v);
+	return 0xff000000 | (rgb & 0x00ffffff);
+}
+
+uint32_t eng_argb_from_u32(uint32_t v) {
+	float l_flt;
+	int factor;
+	int h, s, _v;
+	int hsv;
+	uint8_t vr,vg,vb;
+
+	vr = ((v >> 24) & 0xff) * 4;
+	vg = ((v >> 16) & 0xff) * 4;
+	vb = ((v >> 8) & 0xff) * 4;
 
  	hsv = LightGetHSV(vr, vg, vb);
 
@@ -236,14 +305,11 @@ vec3_t vec3_wrap_angle(vec3_t a) {
 }
 
 float vec3_angle(vec3_t a, vec3_t b) {
-	float dot;
-	vec3f_dot(a.x, a.y, a.z, b.x, b.y, b.z, dot);
+	float dot = vec_dot(a,b);
 
-	float lena;
-	vec3f_length(a.x, a.y, a.z, lena);
+	float lena = vec_length(a);
 
-	float lenb;
-	vec3f_length(b.x, b.y, b.z, lenb);
+	float lenb = vec_length(b);
 
 	float magnitude = lena * lenb;
 
@@ -266,17 +332,13 @@ vec3_t vector_transform(vector_t a) {
 	return vec3(rx,ry,rz);
 }
 
-vec3_t vec3_transform(vec3_t a , mat4_t *mat) {
-	float w = fipr(mat->m[3], mat->m[7], mat->m[11], mat->m[15], a.x, a.y, a.z, 1);
+vec3_t vec3_transform(vec3_t a) {
+	float rx = a.x;
+	float ry = a.y;
+	float rz = a.z;
 
-	float recipw = approx_recip(w);
+	mat_trans_single3(rx,ry,rz);
 
-	float rx = fipr(mat->m[0], mat->m[4], mat->m[8], mat->m[12], a.x, a.y, a.z, 1);
-	rx *= recipw;
-	float ry = fipr(mat->m[1], mat->m[5], mat->m[9], mat->m[13], a.x, a.y, a.z, 1);
-	ry *= recipw;
-	float rz = fipr(mat->m[2], mat->m[6], mat->m[10], mat->m[14], a.x, a.y, a.z, 1);
-	rz *= recipw;
 	return vec3(rx,ry,rz);
 }
 
@@ -288,7 +350,7 @@ vec3_t vec3_project_to_ray(vec3_t p, vec3_t r0, vec3_t r1) {
 
 float vec3_distance_to_plane(vec3_t p, vec3_t plane_pos, vec3_t plane_normal) {
 	float dot_product = vec3_dot(vec3_sub(plane_pos, p), plane_normal);
-	float norm_dot_product = vec3_dot(vec3_inv(plane_normal), plane_normal);
+	float norm_dot_product = -vec_fipr(plane_normal);
 	float rndp = copysignf(approx_recip(norm_dot_product), norm_dot_product);
 	return dot_product * rndp;
 }

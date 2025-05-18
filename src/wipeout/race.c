@@ -23,6 +23,7 @@
 
 #define ATTRACT_DURATION 60.0
 
+
 static bool is_paused = false;
 static bool menu_is_scroll_text = false;
 static float attract_start_time;
@@ -148,11 +149,14 @@ void race_update(void) {
 	track_draw(&g.camera);
 	render_set_cull_backface(true);
 
+	// fewer cache misses when disabling interrupts around some draw calls
+//	irq_disable();
 	ships_draw();
 	droid_draw(&g.droid);
 
 	weapons_draw();
 	particles_draw();
+//	irq_enable();
 
 	// deferred trees and other things
  	if (sprites_to_draw) {

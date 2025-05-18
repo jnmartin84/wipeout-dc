@@ -8,8 +8,6 @@
 #include "wipeout/game.h"
 #include "kos.h"
 
-KOS_INIT_FLAGS(INIT_DEFAULT);
-
 uint8_t allow_exit;
 
 static float time_real;

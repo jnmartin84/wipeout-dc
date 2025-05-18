@@ -10,6 +10,7 @@ typedef enum {
 	UI_SIZE_MAX
 } ui_text_size_t;
 
+// TODO get rid of rgba_t 
 #define UI_COLOR_ACCENT rgba(123*2 -1, 98*2 -1, 12*2 -1, 255)
 #define UI_COLOR_DEFAULT rgba(128*2-1, 128*2-1, 128*2 -1, 255)
 

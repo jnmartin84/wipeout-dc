@@ -123,6 +123,9 @@ extern pvr_dr_state_t dr_state;
 
 void scene_draw(camera_t *camera) {
 	// Sky
+	// get a ~5% boost in FPS by disabling interrupts around object draw
+	// significantly fewer cache misses due to interrupt handlers
+	irq_disable();
 	render_set_depth_write(false);
 	mat4_set_translation(sky_object->mat, vec3_add(camera->position, sky_offset));
 	object_draw(sky_object, sky_object->mat);
@@ -146,7 +149,7 @@ void scene_draw(camera_t *camera) {
 	while (object) {
 		vec3_t diff = vec3_sub(cam_pos, object->origin);
 		float cam_dot = vec3_dot(diff, cam_dir);
-		float dist_sq = vec3_dot(diff, diff);
+		float dist_sq = vec_fipr(diff);
 		if (
 			cam_dot < object->radius &&
 			dist_sq < drawdist
@@ -156,6 +159,7 @@ void scene_draw(camera_t *camera) {
 
 		object = object->next;
 	}
+	irq_enable();
 }
 
 void scene_set_start_booms(int light_index) {

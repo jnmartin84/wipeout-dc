@@ -20,9 +20,7 @@ typedef struct {
 	int32_t x, y;
 } vec2i_t;
 
-typedef struct {
-	float x, y, z;
-} vec3_t;
+typedef vec3f_t vec3_t;
 
 typedef union {
 	float m[16];
@@ -53,8 +51,6 @@ typedef struct {
 		0, 0, 0, 1 \
 	)
 
-// branch-free, division-free atan2f approximation
-// copysignf has a branch
 #define quarterpi_i754 0.785398185253143310546875f
 #define halfpi_i754 1.57079637050628662109375f
 #define pi_i754 3.1415927410125732421875f
@@ -65,6 +61,8 @@ typedef struct {
 
 #define approx_recip(x) (1.0f / sqrtf((x)*(x)))
 
+// division-free atan2f approximation
+// copysignf has a penalty-free branch
 static inline float bump_atan2f(const float y, const float x)
 {
 	float abs_y = fabsf(y) + 1e-10f;
@@ -137,9 +135,7 @@ static inline vec3_t vec3_divf(vec3_t a, float f) {
 }
 
 static inline float vec3_len(vec3_t a) {
-	float len;
-	vec3f_length(a.x, a.y, a.z, len);
-	return len;
+	return vec_length(a);
 }
 
 static inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
@@ -151,27 +147,27 @@ static inline vec3_t vec3_cross(vec3_t a, vec3_t b) {
 }
 
 static inline float vec3_dot(vec3_t a, vec3_t b) {
-	float dot;
-	vec3f_dot(a.x, a.y, a.z, b.x, b.y, b.z, dot);
-	return dot;
+	return vec_dot(a,b);
 }
 
 static inline vec3_t vec3_normalize(vec3_t a) {
-	// this is only used in one place and it is ok to modify
-	vec3f_normalize(a.x,a.y,a.z);
-	return a;
+	// this is only used in one place and it is ok to modify in-place
+	return vec_normalize(a);
 }
 
 static inline float wrap_angle(float a) {
     a += F_PI;
-
-    if (a > twopi_i754) a -= twopi_i754;
-    else if (a < 0) a += twopi_i754;
+	// from profiling
+	if (__builtin_expect((a < 0),1)) { a += twopi_i754; }
+    else if (a > twopi_i754) { a -= twopi_i754; }
 
     return a - F_PI;
 }
 
 uint32_t argb_from_u32(uint32_t v);
+uint32_t notex_argb_from_u32(uint32_t v);
+uint32_t eng_argb_from_u32(uint32_t v);
+uint32_t argb_from_u32_alpha(uint32_t v, uint8_t a);
 uint32_t argb_from_u32_usealpha(uint32_t v);
 float vec3_angle(vec3_t a, vec3_t b);
 vec3_t vec3_wrap_angle(vec3_t a);
@@ -183,7 +179,7 @@ vec3_t vec3_reflect(vec3_t incidence, vec3_t normal);
 float wrap_angle(float a);
 
 vec3_t vector_transform(vector_t a);
-vec3_t vec3_transform(vec3_t a, mat4_t *mat);
+vec3_t vec3_transform(vec3_t a);
 void mat4_set_translation(mat4_t *mat, vec3_t pos);
 void mat4_set_yaw_pitch_roll(mat4_t *m, vec3_t rot);
 void mat4_set_roll_pitch_yaw(mat4_t *mat, vec3_t rot);

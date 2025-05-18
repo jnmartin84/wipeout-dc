@@ -329,15 +329,7 @@ void ship_init_exhaust_plume(ship_t *self) {
 				indices[indices_len++] = prm.ft3->coords[2];
 
 				flags_add(prm.ft3->flag, PRM_TRANSLUCENT);
-				// original color
-				//prm.ft3->color.r = 180;
-				//prm.ft3->color.g = 97 ;
-				//prm.ft3->color.b = 120;
-				//prm.ft3->color.a = 140;
-
-				// what I set it to:
-				// clamped(original color * 2) with original alpha
-				prm.ft3->color = 0x8cffc800;//0x8cffc2f0;
+				prm.ft3->color = (prm.ft3->color & 0x00FFFFFF) | 0x8C000000;
 				prm.ft3->pad1 = 1;
 			}
 			prm.ft3 += 1;
@@ -372,15 +364,7 @@ void ship_init_exhaust_plume(ship_t *self) {
 
 				flags_add(prm.gt3->flag, PRM_TRANSLUCENT);
 				for (int j = 0; j < 3; j++) {
-					// original color
-					//prm.gt3->color[j].r = 180;
-					//prm.gt3->color[j].g = 97 ;
-					//prm.gt3->color[j].b = 120;
-					//prm.gt3->color[j].a = 140;
-
-					// what I set it to:
-					// clamped(original color * 2) with original alpha
-					prm.gt3->color[j] = 0x8cffc800;
+					prm.gt3->color[j] = (prm.gt3->color[j] & 0x00FFFFFF) | 0x8C000000;
 				}
 				prm.gt3->pad1 = 1;
 			}
@@ -542,7 +526,7 @@ void ship_update(ship_t *self) {
 	// the section with the "real" closest distance. Hence the bias of 
 	// vec3(1, 0.25, 1) here.
 	float distance;
-	self->section = track_nearest_section(self->position, vec3(1, 0.25, 1), self->section, &distance);
+	self->section = track_nearest_section_qy(self->position, self->section, &distance);
 	if (distance > 3700) {
 		flags_add(self->flags, SHIP_FLYING);
 	}
@@ -597,7 +581,7 @@ void ship_update(ship_t *self) {
 	}
 
 	self->last_impact_time += system_tick();
-	
+
 	// Call the active player/ai update function
 	(self->update_func)(self);
 

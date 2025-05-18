@@ -172,7 +172,7 @@ void weapons_update(void) {
 			}
 
 			// Track collision
-			weapon->section = track_nearest_section(weapon->position, vec3(1,1,1), weapon->section, NULL);
+			weapon->section = track_nearest_section(weapon->position, weapon->section, NULL);
 			if (weapon_collides_with_track(weapon)) {
 				for (int p = 0; p < 32; p++) {
 					vec3_t velocity = vec3(rand_float(-512, 512), rand_float(-512, 512), rand_float(-512, 512));
@@ -511,8 +511,6 @@ void weapon_update_ebolt(weapon_t *self) {
 	}
 }
 
-int shields_active = 0;
-
 void weapon_fire_shield(ship_t *ship) {
 	weapon_t *self = weapon_init(ship);
 	if (!self) {
@@ -526,14 +524,12 @@ void weapon_fire_shield(ship_t *ship) {
 }
 
 void weapon_update_shield(weapon_t *self) {
-	shields_active = 0;
 	if (self->timer <= 0) {
 		self->active = false;
 		flags_rm(self->owner->flags, SHIP_SHIELDED);
 		return;
 	}
 
-	shields_active = 1;
 	if (flags_is(self->owner->flags, SHIP_VIEW_INTERNAL)) {
 		self->position = ship_cockpit(self->owner);
 		self->model = weapon_assets.shield_internal;

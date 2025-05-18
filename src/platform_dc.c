@@ -16,12 +16,6 @@
 #include <dc/vmu_fb.h>
 #include <dc/vmu_pkg.h>
 
-#include <kos.h>
-#include <dc/maple.h>
-#include <dc/maple/controller.h>
-#include <dc/vmu_fb.h>
-#include <dc/vmu_pkg.h>
-
 uint16_t old_buttons = 0, rel_buttons = 0;
 
 extern uint8_t allow_exit;
@@ -135,11 +129,11 @@ void platform_pump_events()
 static float Sys_FloatTime(void) {
   struct timeval tp;
   struct timezone tzp;
-  static int secbase;
+  static int secbase = 0;
 
   gettimeofday(&tp, &tzp);
 
-#define divisor (1 / 1000000.0f)
+#define divisor 0.000001f
 
   if (!secbase) {
     secbase = tp.tv_sec;
@@ -182,7 +176,7 @@ int vmu_check(void);
 extern int32_t ControllerPakStatus;
 extern int32_t Pak_Memory;
 extern const unsigned short vmu_icon_pal[16];
-extern const uint8_t icon1_data[512*3];
+extern uint8_t icon1_data[512*3];
 
 uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 	ssize_t size;
@@ -198,7 +192,7 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 		return NULL;
 	}
 
-	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY);
+	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY | O_META);
 	if (!d) {
 		dbgio_printf("platform_load_userdata: could not fs_open %s\n", get_vmu_fn(vmudev, "wipeout.dat"));
 		*bytes_read = 0;
@@ -246,7 +240,7 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 
 	fs_close(d);
 
-	if(vmu_pkg_parse(data, &pkg) < 0) {
+	if(vmu_pkg_parse(data, size, &pkg) < 0) {
 		free(data);
  		*bytes_read = 0;
 		dbgio_printf("platform_load_userdata: could not vmu_pkg_parse\n");
@@ -297,20 +291,20 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 	pkg.data_len = len;
 	pkg.data = bytes;
 
-	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY);
+	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY | O_META);
 	if (!d) {
 		if (Pak_Memory < USERDATA_BLOCK_COUNT){
 			dbgio_printf("platform_store_userdata: no wipeout file and not enough space\n");
 			return 0;
 		}
-		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDWR | O_CREAT);
+		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDWR | O_CREAT | O_META);
 		if (!d) {
 			dbgio_printf("platform_store_userdata: cant open wipeout for rdwr|creat\n");
 			return 0;
 		}
 	} else {
 		fs_close(d);
-		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_WRONLY);
+		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_WRONLY | O_META);
 		if (!d) {
 			dbgio_printf("platform_store_userdata: could not open file\n");
 			return 0;
@@ -368,14 +362,11 @@ void platform_end_frame(void) {
 	; //
 }
 
-rgba_t *platform_get_screenbuffer(int32_t *pitch) {
-	return NULL;
-}
-
 vec2i_t platform_screen_size(void) {
 	return screen_size;
 }
 
+KOS_INIT_FLAGS(INIT_DEFAULT);
 int main(int argc, char *argv[]) {
 	// Figure out the absolute asset and userdata paths. These may either be
 	// supplied at build time through -DPATH_ASSETS=.. and -DPATH_USERDATA=..

@@ -19,9 +19,23 @@
 
 #include <kos.h>
 
-extern uint32_t mem_available(void);
+static float __attribute__((aligned(32))) w[4];
+extern pvr_vertex_t vs[5];
+
+// try to promote spatial locality for accessing these pointers
+// reading one of the two pointers was missing the cache every time
+// not dereferencing, just loading the pointer to begin with
+typedef struct other_state {
+	float *ws;
+	pvr_vertex_t *evs;
+} other_state_t;
+
+static other_state_t vars;
 
 Object *objects_load(char *name, texture_list_t tl) {
+	vars.ws = &w[0];
+	vars.evs = &vs[0];
+
 	uint32_t __attribute__((aligned(32))) p = 0;
 	uint32_t length = 0;
 	uint8_t *bytes = platform_load_asset(name, &length);
@@ -152,6 +166,7 @@ Object *objects_load(char *name, texture_list_t tl) {
 			Prm prm;
 			int16_t prm_type = get_i16(bytes, &p);
 			int16_t prm_flag = get_i16(bytes, &p);
+
 			switch (prm_type) {
 			case PRM_TYPE_F3:
 				prm.ptr = mem_bump(sizeof(F3));
@@ -161,7 +176,9 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.f3->coords[1] = get_i16(bytes, &p);
 				prm.f3->coords[2] = get_i16(bytes, &p);
 				prm.f3->pad1 = get_i16(bytes, &p);
-				prm.f3->color = argb_from_u32(get_u32(bytes, &p));
+				// untextured polys use normal r,g,b range of 0-255
+				// where 255 is full bright, unlike textured polys
+				prm.f3->color = notex_argb_from_u32(get_u32(bytes, &p));
 				break;
 
 			case PRM_TYPE_F4:
@@ -172,7 +189,9 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.f4->coords[1] = get_i16(bytes, &p);
 				prm.f4->coords[2] = get_i16(bytes, &p);
 				prm.f4->coords[3] = get_i16(bytes, &p);
-				prm.f4->color = argb_from_u32(get_u32(bytes, &p));
+				// untextured polys use normal r,g,b range of 0-255
+				// where 255 is full bright, unlike textured polys
+				prm.f4->color = notex_argb_from_u32(get_u32(bytes, &p));
 				break;
 
 			case PRM_TYPE_FT3:
@@ -270,9 +289,11 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.g3->coords[1] = get_i16(bytes, &p);
 				prm.g3->coords[2] = get_i16(bytes, &p);
 				prm.g3->pad1 = get_i16(bytes, &p);
-				prm.g3->color[0] = argb_from_u32(get_u32(bytes, &p));
-				prm.g3->color[1] = argb_from_u32(get_u32(bytes, &p));
-				prm.g3->color[2] = argb_from_u32(get_u32(bytes, &p));
+				// untextured polys use normal r,g,b range of 0-255
+				// where 255 is full bright, unlike textured polys
+				prm.g3->color[0] = notex_argb_from_u32(get_u32(bytes, &p));
+				prm.g3->color[1] = notex_argb_from_u32(get_u32(bytes, &p));
+				prm.g3->color[2] = notex_argb_from_u32(get_u32(bytes, &p));
 				break;
 
 			case PRM_TYPE_G4:
@@ -283,10 +304,12 @@ Object *objects_load(char *name, texture_list_t tl) {
 				prm.g4->coords[1] = get_i16(bytes, &p);
 				prm.g4->coords[2] = get_i16(bytes, &p);
 				prm.g4->coords[3] = get_i16(bytes, &p);
-				prm.g4->color[0] = argb_from_u32(get_u32(bytes, &p));
-				prm.g4->color[1] = argb_from_u32(get_u32(bytes, &p));
-				prm.g4->color[2] = argb_from_u32(get_u32(bytes, &p));
-				prm.g4->color[3] = argb_from_u32(get_u32(bytes, &p));
+				// untextured polys use normal r,g,b range of 0-255
+				// where 255 is full bright, unlike textured polys
+				prm.g4->color[0] = notex_argb_from_u32(get_u32(bytes, &p));
+				prm.g4->color[1] = notex_argb_from_u32(get_u32(bytes, &p));
+				prm.g4->color[2] = notex_argb_from_u32(get_u32(bytes, &p));
+				prm.g4->color[3] = notex_argb_from_u32(get_u32(bytes, &p));
 				break;
 
 			case PRM_TYPE_GT3:
@@ -443,7 +466,8 @@ Object *objects_load(char *name, texture_list_t tl) {
 
 					prm.ft3->pad1 = 0;
 					get_i16(bytes, &p); // was pad1
-					prm.ft3->color = argb_from_u32(get_u32(bytes, &p));
+					// engine colors are 25% of what they should be
+					prm.ft3->color = eng_argb_from_u32(get_u32(bytes, &p));
 
 					tsize = render_texture_padsize(prm.ft3->texture);
 					pw = 1.0f / (float)tsize.x;
@@ -535,9 +559,10 @@ Object *objects_load(char *name, texture_list_t tl) {
 					prm.gt3->v2 = get_i8(bytes, &p);
 					prm.gt3->pad1 = 0;
 					get_i16(bytes, &p); // was pad1
-					prm.gt3->color[0] = argb_from_u32(get_u32(bytes, &p));
-					prm.gt3->color[1] = argb_from_u32(get_u32(bytes, &p));
-					prm.gt3->color[2] = argb_from_u32(get_u32(bytes, &p));
+					// engine colors are 25% of what they should be
+					prm.gt3->color[0] = eng_argb_from_u32(get_u32(bytes, &p));
+					prm.gt3->color[1] = eng_argb_from_u32(get_u32(bytes, &p));
+					prm.gt3->color[2] = eng_argb_from_u32(get_u32(bytes, &p));
 
 					tsize = render_texture_padsize(prm.gt3->texture);
 					pw = 1.0f / (float)tsize.x;
@@ -613,7 +638,9 @@ Object *objects_load(char *name, texture_list_t tl) {
 	return objectList;
 }
 
-extern pvr_vertex_t vs[5];
+
+
+
 
 struct SortedSprite_s {
 	uint8_t *ptr;
@@ -627,12 +654,20 @@ struct SortedSprite_s __attribute__((aligned(32))) sprs[256];
 int sprites_to_draw = 0;
 int max_sprites_to_draw = 0;
 void draw_all_sprites(void) {
+	int mat_change = 0;
+	mat4_t *last_mat = NULL;
+
 	for (int i=0;i<sprites_to_draw;i++) {
 		struct SortedSprite_s *tmp = &sprs[i];
 		Prm poly = {.primitive = (Primitive*)tmp->ptr};
 		int coord0 = poly.spr->coord;
 
-		render_set_model_mat(tmp->mat);
+		// don't need to change the model matrix for every sprite drawn, there is a savings here
+		if (last_mat != tmp->mat) {
+			render_set_model_mat(tmp->mat);
+			last_mat = tmp->mat;
+			mat_change++;
+		}
 
 		render_push_sprite(
 			vec3(
@@ -657,7 +692,6 @@ void emplace_ssp(uint8_t *p, mat4_t *mat, vector_t *v) {
 	rsp->vertex = v;
 }
 
-static float __attribute__((aligned(32))) w[4];
 static void (*quadfunc)(uint16_t texture_index, float *w);
 static void (*trifunc)(uint16_t texture_index, float *w);
 
@@ -667,6 +701,10 @@ void object_draw(Object *object, mat4_t *mat) {
 	vector_t *vertex = object->xform;
 	Prm poly = {.primitive = object->primitives};
 	int primitives_len = object->primitives_len;
+
+	// scope-local redefinitions
+	float *w = vars.ws;
+	pvr_vertex_t *vs = vars.evs;
 
 	render_set_model_mat(mat);
 	int wtest = xform_all_verts(object->xform, object->vertices, object->vertices_len);
