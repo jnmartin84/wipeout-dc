@@ -9,7 +9,9 @@ https://github.com/phoboslab/wipeout-rewrite
 ***
 
 ***
-This is the fifth bug-fix release for v2. 
+This is the sixth bug-fix/update release for v2. 
+
+If you have cloned/built Wipeout prior to 2025/05/18, you will need to unpack and rebuild the custom KOS included as it has changed (Wipeout-DC code won't build anymore if you don't).
 
 Current feature set includes: Extended draw distance, 16:9 anamorphic widescreen available,
 
@@ -25,7 +27,7 @@ VMU save/load for settings and high scores (6 blocks required), full input remap
 ***
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI`.
 
-https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.5
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.6
 
 Note that playing in emulation is not supported. If you run into trouble and need a solution, buy a Dreamcast.
 
