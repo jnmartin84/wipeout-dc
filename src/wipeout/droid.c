@@ -107,7 +107,7 @@ void droid_update(droid_t *droid, ship_t *ship) {
 	droid->angle = vec3_add(droid->angle, vec3_mulf(droid->angular_velocity, tick/* system_tick() */));
 	droid->angle = vec3_wrap_angle(droid->angle);
 	
-	float tractor_vol = flags_is(droid->sfx_tractor->flags, SFX_PLAY) ? 0.5f : 0.0f;
+	float tractor_vol = flags_is(droid->sfx_tractor->flags, SFX_PLAY) ? 1.0f : 0.0f;
 
 //	if (flags_is(droid->sfx_tractor->flags, SFX_PLAY)) {
 	sfx_set_position(droid->sfx_tractor, droid->position, droid->velocity, tractor_vol);

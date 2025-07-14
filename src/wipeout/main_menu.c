@@ -415,7 +415,7 @@ extern void __attribute__((noinline)) wav_volume(int volume);
 static void toggle_music_volume(menu_t *menu, int data) {
 	save.music_volume = (float)data * 0.1;
 	save.is_dirty = true;
-	wav_volume(192 * save.music_volume);
+	wav_volume(160 * save.music_volume);
 }
 
 static void toggle_sfx_volume(menu_t *menu, int data) {

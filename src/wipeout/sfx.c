@@ -216,9 +216,9 @@ sfx_t *sfx_play(sfx_source_t source_index) {
 	sfx->data.loopstart = 0;
 	sfx->data.loopend = 0;
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch == 1.0f ? 44100 : 22050;
 
@@ -247,9 +247,9 @@ sfx_t *sfx_play_at(sfx_source_t source_index, vec3_t pos, vec3_t vel, float volu
 		sfx->data.loopstart = 0;
 		sfx->data.loopend = 0;
 		if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-			sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
+			sfx->data.vol = (sfx->volume * 212) * unpause_sfx_volume;
 		else
-			sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
+			sfx->data.vol = (sfx->volume * 212) * save.sfx_volume;
 		sfx->data.pan = 127 + (sfx->pan*128);
 		sfx->data.freq = sfx->pitch * 22050;
 		snd_sfx_play_ex(&sfx->data);
@@ -283,9 +283,9 @@ sfx_t *sfx_reserve_loop(sfx_source_t source_index) {
 
 void sfx_update_ex(sfx_t *sfx) {
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch * 44100;
 
@@ -306,9 +306,9 @@ void sfx_set_position(sfx_t *sfx, vec3_t pos, vec3_t vel, float volume) {
 	sfx->pitch = (262144.0 - away) * 0.0000019073486328125f; // / 524288.0;
 
 	if (sfx_from_menu && (unpause_sfx_volume > 0.0f))
-		sfx->data.vol = (sfx->volume * 126) * unpause_sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * unpause_sfx_volume;
 	else
-		sfx->data.vol = (sfx->volume * 126) * save.sfx_volume;
+		sfx->data.vol = (sfx->volume * 212) * save.sfx_volume;
 	sfx->data.pan = 127 + (sfx->pan*128);
 	sfx->data.freq = sfx->pitch * 44100;
 
