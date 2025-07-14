@@ -1,6 +1,6 @@
 ***
 
-# Wipeout-Rewrite port for Dreamcast
+# Wipeout-Rewrite port for Dreamcast (updated 2025/07/13)
 
 ***
 Wipeout-DC is a port of the Wipeout Rewrite project by Dominic Szablewski which can be found at:
@@ -9,7 +9,7 @@ https://github.com/phoboslab/wipeout-rewrite
 ***
 
 ***
-This is the sixth bug-fix/update release for v2. 
+This is the seventh bug-fix/update release for v2. I took some time to rebalance the volumes and make a new CDI.
 
 If you have cloned/built Wipeout prior to 2025/05/18, you will need to unpack and rebuild the custom KOS included as it has changed (Wipeout-DC code won't build anymore if you don't).
 
@@ -27,11 +27,13 @@ VMU save/load for settings and high scores (6 blocks required), full input remap
 ***
 Go to the `Releases` section of the Github repo. A `7z` file is provided with `CDI`.
 
-https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.6
+https://github.com/jnmartin84/wipeout-dc/releases/tag/v2.7
 
 Note that playing in emulation is not supported. If you run into trouble and need a solution, buy a Dreamcast.
 
-Do not file a Github issue, I will just close it without reading.
+If you have a Dreamcast but you're using a GDEMU, you're also out of luck. I don't own one. I will never own one. I can't help.
+
+If you file a Github issue related to emulation or GDEMU, I will close it without reading.
 ***
 
 #### Default controls:
