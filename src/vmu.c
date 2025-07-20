@@ -49,3 +49,42 @@ void draw_vmu_icon(void) {
 	if ((vmudev = maple_enum_type(0, MAPLE_FUNC_LCD)))
 		vmu_draw_lcd(vmudev, owl2_bits);
 }
+
+//static dirent_t __attribute__((aligned(32))) FileState[200];
+int vmu_check(void) {
+	maple_device_t *vmudev = NULL;
+
+	ControllerPakStatus = 0;
+
+	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
+	if (!vmudev)
+		return 1;
+
+	file_t d;
+	dirent_t *de;
+
+	d = fs_open(get_vmu_fn(vmudev, NULL), O_RDONLY | O_DIR);
+	if(-1 == d)
+		return 1;
+
+	Pak_Memory = 200;
+
+	//memset(FileState, 0, sizeof(dirent_t)*200);
+
+	int FileCount = 0;
+	while (NULL != (de = fs_readdir(d))) {
+		if (strcmp(de->name, ".") == 0)
+			continue;
+		if (strcmp(de->name, "..") == 0)
+			continue;
+
+		//memcpy(&FileState[FileCount++], de, sizeof(dirent_t));			
+		Pak_Memory -= (de->size / 512);
+	}
+
+	fs_close(d);
+
+	ControllerPakStatus = 1;
+
+	return 0;
+}

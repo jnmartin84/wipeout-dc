@@ -182,8 +182,9 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 	ssize_t size;
 	maple_device_t *vmudev = NULL;
 	uint8_t *data;
-
 	ControllerPakStatus = 0;
+
+	vmu_check();
 
 	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
 	if (!vmudev) {
@@ -193,7 +194,7 @@ uint8_t *platform_load_userdata(const char *name, uint32_t *bytes_read) {
 	}
 
 	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY | O_META);
-	if (!d) {
+	if (-1 == d) {
 		dbgio_printf("platform_load_userdata: could not fs_open %s\n", get_vmu_fn(vmudev, "wipeout.dat"));
 		*bytes_read = 0;
 		return NULL;
@@ -273,6 +274,8 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 
 	ControllerPakStatus = 0;
 
+	vmu_check();
+
 	vmudev = maple_enum_type(0, MAPLE_FUNC_MEMCARD);
 	if (!vmudev) {
 		dbgio_printf("platform_store_userdata: could not enum\n");
@@ -292,20 +295,20 @@ uint32_t platform_store_userdata(const char *name, void *bytes, int32_t len) {
 	pkg.data = bytes;
 
 	file_t d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDONLY | O_META);
-	if (!d) {
+	if (-1 == d) {
 		if (Pak_Memory < USERDATA_BLOCK_COUNT){
 			dbgio_printf("platform_store_userdata: no wipeout file and not enough space\n");
 			return 0;
 		}
 		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_RDWR | O_CREAT | O_META);
-		if (!d) {
+		if (-1 == d) {
 			dbgio_printf("platform_store_userdata: cant open wipeout for rdwr|creat\n");
 			return 0;
 		}
 	} else {
 		fs_close(d);
 		d = fs_open(get_vmu_fn(vmudev, "wipeout.dat"), O_WRONLY | O_META);
-		if (!d) {
+		if (-1 == d) {
 			dbgio_printf("platform_store_userdata: could not open file\n");
 			return 0;
 		}
@@ -376,16 +379,16 @@ int main(int argc, char *argv[]) {
 	if (f != -1) {
 		fs_close(f);
 		f = 0;
-		path_assets = "/cd";
-		path_userdata = "/cd/wipeout";
+		path_assets = "/cd/";
+		path_userdata = "/cd/wipeout/";
 		allow_exit = 0;
 	} else {
 		f = fs_open("/pc/wipeout/common/mine.cmp", O_RDONLY);
 		if (f != -1) {
 			fs_close(f);
 			f = 0;
-			path_assets = "/pc";
-			path_userdata = "/pc/wipeout";
+			path_assets = "/pc/";
+			path_userdata = "/pc/wipeout/";
 			allow_exit = 1;
 		} else {
 			printf("CANT FIND ASSETS ON /PC or /CD; TERMINATING!\n");
