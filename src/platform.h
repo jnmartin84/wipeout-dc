@@ -4,6 +4,7 @@
 #include "types.h"
 
 void platform_exit(void);
+int platform_num_controllers(void);
 vec2i_t platform_screen_size(void);
 float platform_now(void);
 bool platform_get_fullscreen(void);

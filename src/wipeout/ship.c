@@ -1,6 +1,7 @@
 #include "../mem.h"
 #include "../utils.h"
 #include "../system.h"
+#include "../input.h"
 
 #include "object.h"
 #include "scene.h"
@@ -132,7 +133,14 @@ void ships_update(void) {
 			}
 		}
 
-		if (flags_is(g.ships[g.pilot].flags, SHIP_RACING)) {
+		bool human_racing = false;
+		for (int p = 0; p < g.num_players; p++) {
+			if (flags_is(g.ships[g.human_pilot[p]].flags, SHIP_RACING)) {
+				human_racing = true;
+			}
+		}
+
+		if (human_racing) {
 			sort(g.race_ranks, len(g.race_ranks), sort_rank_compare);
 			for (int32_t i = 0; i < len(g.ships); i++) {
 				g.ships[g.race_ranks[i].pilot].position_rank = i + 1;
@@ -149,6 +157,7 @@ void ships_reset_exhaust_plumes(void) {
 
 void ships_draw(void) {
 	uint8_t draw_this = 0;
+	int vis_test_dist = (g.num_players > 2) ? SHIP_VISIBLE_SECTIONS_3_4_PLAYERS : SHIP_VISIBLE_SECTIONS;
 
 	// Ship models
 	render_set_depth_write(true);
@@ -156,20 +165,20 @@ void ships_draw(void) {
 
 	for (int i = 0; i < len(g.ships); i++) {
 		if (
-			(flags_is(g.ships[i].flags, SHIP_VIEW_INTERNAL) && flags_not(g.ships[i].flags, SHIP_IN_RESCUE)) ||
+			(i == g.render_pilot && flags_is(g.ships[i].flags, SHIP_VIEW_INTERNAL) && flags_not(g.ships[i].flags, SHIP_IN_RESCUE)) ||
 			(g.race_type == RACE_TYPE_TIME_TRIAL && i != g.pilot)
 		) {
 			continue;
 		}
 
-		if (i == g.pilot) {
+		if (i == g.render_pilot) {
 			draw_this |= (1 << i);
 		} else {
-#define VIS_TEST_DIST 20
+#define VIS_TEST_DIST vis_test_dist
 			int distance = VIS_TEST_DIST;
 			int sc = g.track.section_count;
 
-			int pilot_secnum = g.ships[g.pilot].section_num;
+			int pilot_secnum = g.ships[g.render_pilot].section_num;
 			int other_secnum = g.ships[i].section_num;
 
 			if (abs(other_secnum - pilot_secnum) < VIS_TEST_DIST) {
@@ -252,7 +261,14 @@ void ship_init(ship_t *self, section_t *section, int pilot, int inv_start_rank) 
 	self->update_timer = UPDATE_TIME_INITIAL;
 	self->position_rank = NUM_PILOTS - inv_start_rank;
 
-	if (pilot == g.pilot) {
+	self->player_index = -1;
+	for (int p = 0; p < g.num_players; p++) {
+		if (g.human_pilot[p] == pilot) {
+			self->player_index = p;
+		}
+	}
+
+	if (self->player_index >= 0) {
 		self->update_func = ship_player_update_intro;
 		self->remote_thrust_max = 2900;
 		self->remote_thrust_mag = 46;
@@ -566,7 +582,7 @@ void ship_update(ship_t *self) {
 		self->weapon_type == WEAPON_TYPE_NONE &&
 		track_collect_pickups(face)
 	) {
-		if (self->pilot == g.pilot) {
+		if (self->player_index >= 0) {
 			sfx_play(SFX_POWERUP);
 			if (flags_is(self->flags, SHIP_SHIELDED)) {
 				self->weapon_type = weapon_get_random_type(WEAPON_CLASS_PROJECTILE);
@@ -582,14 +598,17 @@ void ship_update(ship_t *self) {
 
 	self->last_impact_time += system_tick();
 
-	// Call the active player/ai update function
+	// Call the active player/ai update function. Human players read their
+	// own controller.
+	input_set_current_player(self->player_index >= 0 ? self->player_index : 0);
 	(self->update_func)(self);
+	input_set_current_player(0);
 
 	// Animate the exhaust plume
 
 	int exhaust_len;
 
-	if (self->pilot == g.pilot) {
+	if (self->player_index >= 0) {
 		// get the z exhaust_len related to speed or thrust
 		exhaust_len = self->thrust_mag * 0.0625;
 		exhaust_len += self->speed * 0.00390625;
@@ -638,8 +657,8 @@ void ship_update(ship_t *self) {
 				self->weapon_type = WEAPON_TYPE_TURBO;
 			}
 
-			if (self->lap == NUM_LAPS && self->pilot == g.pilot) {
-				race_end();
+			if (self->lap == NUM_LAPS && self->player_index >= 0) {
+				race_player_finished(self->player_index);
 			}
 		}
 	}

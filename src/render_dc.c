@@ -41,12 +41,23 @@ static float shakex = 320.0f;
 static float shakey = 240.0f;
 static float shakeCount = 0.0f;
 
+// Split screen viewport (see render_set_viewport)
+static int vp_split = 0;
+static uint32_t vp_clip_bits = 0;
+static float vp_ox = 0.0f, vp_oy = 0.0f, vp_hw = 320.0f, vp_hh = 240.0f;
+static float proj_x = 1.0f, proj_f = 1.0f;
+
+// Split screen: horizontal field of view compared to the full screen one.
+// Lower than 1.0 gives a wider angle (more of the track around the ship).
+#define SPLIT_FOV_SCALE 0.9f
+static vec2i_t full_screen_size;
+
 #define NEAR_PLANE 16.0f
 #define FAR_PLANE (RENDER_FADEOUT_FAR)
 
 #define TEXTURES_MAX 256
 
-#define RENDER_STATEMAP(w,t,c,bl) (((int)(w) << 1) | ((int)(t) << 2) | ((int)(bl) << 4))
+#define RENDER_STATEMAP(w,t,c,bl) (((int)(w) << 1) | ((int)(t) << 2) | ((int)vp_split << 3) | ((int)(bl) << 4))
 
 extern void memcpy32(const void *dst, const void *src, size_t s);
 
@@ -243,12 +254,14 @@ static void update_header(uint16_t texture_index) {
 			header2 |= (PVR_BLEND_ONE << PVR_TA_PM2_SRCBLEND_SHIFT) | (PVR_BLEND_INVSRCALPHA << PVR_TA_PM2_DSTBLEND_SHIFT);
 		}
 
+		hp[0] = (hp[0] & ~PVR_TA_CMD_USERCLIP_MASK) | vp_clip_bits;
 		hp[1] = header1;
 		hp[2] = header2;
 
 		// culling on
 		header1 |= (PVR_CULLING_CCW << PVR_TA_PM1_CULLING_SHIFT);
 		hp = (uint32_t *)chdr[texture_index][1];
+		hp[0] = (hp[0] & ~PVR_TA_CMD_USERCLIP_MASK) | vp_clip_bits;
 		hp[1] = header1;
 		hp[2] = header2;
 }
@@ -363,6 +376,10 @@ void render_set_screen_size(vec2i_t size) {
 	float f = 1.0f / tanf(fov * 0.5f);
 	float nf = 1.0f / (NEAR_PLANE - 96000.0f);
 
+	full_screen_size = size;
+	proj_f = f;
+	proj_x = f / aspect;
+
 	projection_mat = mat4(
 		f / aspect, 0, 0, 0,
 		0, f, 0, 0,
@@ -392,6 +409,66 @@ void render_set_post_effect(render_post_effect_t post) {
 
 vec2i_t render_size(void) {
 	return screen_size;
+}
+
+static uint32_t __attribute__((aligned(32))) vp_clip_pkt[8];
+
+void render_set_viewport(int x, int y, int w, int h) {
+	int split = !(x == 0 && y == 0 && w == 640 && h == 480);
+
+	vp_split = split;
+	vp_ox = ((float)x + (float)w * 0.5f) - 320.0f;
+	vp_oy = ((float)y + (float)h * 0.5f) - 240.0f;
+	vp_hw = (float)w * 0.5f;
+	vp_hh = (float)h * 0.5f;
+	screen_size = split ? vec2i(w, h) : full_screen_size;
+
+	// Keep the horizontal field of view, adapt the vertical one
+	float sx = split ? proj_x * SPLIT_FOV_SCALE : proj_x;
+	float sy = split ? sx * ((float)w / (float)h) : proj_f;
+	projection_mat.m[0] = sx;
+	projection_mat.m[5] = sy;
+	vp_mat.m[0] = sx;
+	vp_mat.m[5] = sy;
+
+	if (split) {
+		// Hardware user clip, in 32x32 pixels tiles (inclusive end)
+		vp_clip_pkt[0] = PVR_CMD_USERCLIP;
+		vp_clip_pkt[1] = 0;
+		vp_clip_pkt[2] = 0;
+		vp_clip_pkt[3] = 0;
+		vp_clip_pkt[4] = (uint32_t)(x >> 5);
+		vp_clip_pkt[5] = (uint32_t)(y >> 5);
+		vp_clip_pkt[6] = (uint32_t)(((x + w) >> 5) - 1);
+		vp_clip_pkt[7] = (uint32_t)(((y + h) >> 5) - 1);
+		pvr_prim(vp_clip_pkt, 32);
+	}
+
+	// Every polygon header has to carry the user clip mode
+	vp_clip_bits = split ? ((uint32_t)PVR_USERCLIP_INSIDE << PVR_TA_CMD_USERCLIP_SHIFT) : 0;
+	for (int i = 0; i < 2; i++) {
+		uint32_t *hp = (uint32_t *)&chdr_notex[i];
+		hp[0] = (hp[0] & ~PVR_TA_CMD_USERCLIP_MASK) | vp_clip_bits;
+	}
+	{
+		uint32_t *hp = (uint32_t *)&hud_hdr;
+		hp[0] = (hp[0] & ~PVR_TA_CMD_USERCLIP_MASK) | vp_clip_bits;
+	}
+
+	// Force the next polygon to send a new header
+	render_state.cur_mode = RENDER_STATEMAP(render_state.dep_en,render_state.test_en,render_state.cull_en,render_state.blend_mode);
+	render_state.last_index = 256;
+}
+
+void render_reset_viewport(void) {
+	render_set_viewport(0, 0, 640, 480);
+}
+
+// Close the opaque list and open the transparent one
+void render_begin_transparent_list(void) {
+	pvr_list_finish();
+	pvr_list_begin(PVR_LIST_TR_POLY);
+	pvr_dr_init(&dr_state);
 }
 
 void render_frame_prepare(void) {
@@ -562,10 +639,10 @@ static inline void perspdiv(pvr_vertex_t *v, float w) {
 #if RENDER_USE_FSAA
 	x = shakex + (640.0f * x);
 #else
-	x = shakex + (320.0f * x);
+	x = shakex + vp_ox + (vp_hw * x);
 #endif
 	// 4:3 or 16:9 anamorphic
-	y = shakey - (240.0f * y);
+	y = shakey + vp_oy - (vp_hh * y);
 
 	v->x = x;
 	v->y = y;

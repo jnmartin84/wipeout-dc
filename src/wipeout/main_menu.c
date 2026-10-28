@@ -17,6 +17,7 @@ static void page_options_init(menu_t *menu);
 static void page_race_class_init(menu_t *menu);
 static void page_race_type_init(menu_t *menu);
 static void page_team_init(menu_t *menu);
+static void page_players_init(menu_t *menu);
 static void page_pilot_init(menu_t *menu);
 static void page_circut_init(menu_t *menu);
 static void page_options_controls_init(menu_t *menu);
@@ -644,7 +645,15 @@ static void page_race_class_init(menu_t *menu) {
 static void button_race_type_select(menu_t *menu, int data) {
 	g.race_type = data;
 	g.highscore_tab = g.race_type == RACE_TYPE_TIME_TRIAL ? HIGHSCORE_TAB_TIME_TRIAL : HIGHSCORE_TAB_RACE;
-	page_team_init(menu);
+	g.players_chosen = 1;
+
+	// Several players: single race only, and only if more controllers are plugged in
+	if (g.race_type == RACE_TYPE_SINGLE && platform_num_controllers() > 1) {
+		page_players_init(menu);
+	}
+	else {
+		page_team_init(menu);
+	}
 }
 
 static void page_race_type_draw(menu_t *menu, int data) {
@@ -669,6 +678,45 @@ static void page_race_type_init(menu_t *menu) {
 	page->items_anchor = UI_POS_BOTTOM | UI_POS_CENTER;
 	for (int i = 0; i < len(def.race_types); i++) {
 		menu_page_add_button(page, i, def.race_types[i].name, button_race_type_select);
+	}
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Number of players
+
+static void button_players_select(menu_t *menu, int data) {
+	g.players_chosen = data;
+	page_team_init(menu);
+}
+
+static void page_players_draw(menu_t *menu, int data) {
+	draw_model(models.misc.single_race, vec2(0, -0.2), vec3(0, 0, -400), system_cycle_time());
+}
+
+static void page_players_init(menu_t *menu) {
+	static const char *labels[MAX_HUMAN_PLAYERS] = {"1 PLAYER", "2 PLAYERS", "3 PLAYERS", "4 PLAYERS"};
+
+	menu_page_t *page = menu_push(menu, "SELECT NUMBER", page_players_draw);
+	page->subtitle = "OF PLAYERS";
+	flags_add(page->layout_flags, MENU_FIXED);
+	if (platform_screen_size().y == 360) {
+		page->title_pos = vec2i(0, 20);
+		page->items_pos = vec2i(0, -80);
+	} else {
+		page->title_pos = vec2i(0, 30);
+		page->items_pos = vec2i(0, -110);
+	}
+	page->title_anchor = UI_POS_TOP | UI_POS_CENTER;
+	page->items_anchor = UI_POS_BOTTOM | UI_POS_CENTER;
+
+	int available = platform_num_controllers();
+	if (available > MAX_HUMAN_PLAYERS) {
+		available = MAX_HUMAN_PLAYERS;
+	}
+	for (int i = 1; i <= available; i++) {
+		menu_page_add_button(page, i, labels[i - 1], button_players_select);
 	}
 }
 

@@ -57,12 +57,35 @@ vec3_t ship_ai_strat_hold_right(ship_t *self, track_face_t *face) {
 }
 
 
+// The AI reacts to the human player who is the closest to it on the track
+// (players who finished the race are ignored while others are still racing).
+static ship_t *ship_ai_nearest_human(ship_t *self) {
+	ship_t *best = &g.ships[g.pilot];
+	int best_diff = 0x7fffffff;
+	bool best_racing = false;
+
+	for (int p = 0; p < g.num_players; p++) {
+		ship_t *human = &g.ships[g.human_pilot[p]];
+		bool racing = flags_is(human->flags, SHIP_RACING);
+		int diff = self->total_section_num - human->total_section_num;
+		if (diff < 0) {
+			diff = -diff;
+		}
+		if ((racing && !best_racing) || (racing == best_racing && diff < best_diff)) {
+			best = human;
+			best_diff = diff;
+			best_racing = racing;
+		}
+	}
+	return best;
+}
+
 vec3_t ship_ai_strat_hold_center(ship_t *self, track_face_t *face) {
 	return vec3(0, 0, 0);
 }
 
 vec3_t ship_ai_strat_block(ship_t *self, track_face_t *face) {
-	if (flags_is(g.ships[g.pilot].flags, SHIP_LEFT_SIDE)) {
+	if (flags_is(ship_ai_nearest_human(self)->flags, SHIP_LEFT_SIDE)) {
 		return ship_ai_strat_hold_left(self, face);
 	}
 	else {
@@ -72,7 +95,7 @@ vec3_t ship_ai_strat_block(ship_t *self, track_face_t *face) {
 }
 
 vec3_t ship_ai_strat_avoid(ship_t *self, track_face_t *face) {
-	if (flags_is(g.ships[g.pilot].flags, SHIP_LEFT_SIDE)) {
+	if (flags_is(ship_ai_nearest_human(self)->flags, SHIP_LEFT_SIDE)) {
 		return ship_ai_strat_hold_right(self, face);
 	}
 	else {
@@ -123,7 +146,7 @@ vec3_t ship_ai_strat_zig_zag(ship_t *self, track_face_t *face) {
 void ship_ai_update_race(ship_t *self) {
 	vec3_t offset_vector = vec3(0, 0, 0);
 
-	ship_t *player = &(g.ships[g.pilot]);
+	ship_t *player = ship_ai_nearest_human(self);
 
 	if (self->ebolt_timer > 0) {
 		self->ebolt_timer -= system_tick();
@@ -266,7 +289,7 @@ void ship_ai_update_race(ship_t *self) {
 								if (flags_not(self->flags, SHIP_SHIELDED) && flags_is(self->flags, SHIP_RACING)) {
 									sfx_play(SFX_VOICE_MISSILE);
 									self->weapon_type = WEAPON_TYPE_MISSILE;
-									self->weapon_target = &g.ships[g.pilot];
+									self->weapon_target = player;
 									weapons_fire_delayed(self, self->weapon_type);
 								}
 							}
@@ -276,7 +299,7 @@ void ship_ai_update_race(ship_t *self) {
 								if (flags_not(self->flags, SHIP_SHIELDED) && flags_is(self->flags, SHIP_RACING)) {
 									sfx_play(SFX_VOICE_SHOCKWAVE);
 									self->weapon_type = WEAPON_TYPE_EBOLT;
-									self->weapon_target = &g.ships[g.pilot];
+									self->weapon_target = player;
 									weapons_fire_delayed(self, self->weapon_type);
 								}
 							}

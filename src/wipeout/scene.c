@@ -121,7 +121,7 @@ void scene_update(void) {
 extern pvr_vertex_t vs[5];
 extern pvr_dr_state_t dr_state;
 
-void scene_draw(camera_t *camera) {
+void scene_draw_sky(camera_t *camera) {
 	// Sky
 	// get a ~5% boost in FPS by disabling interrupts around object draw
 	// significantly fewer cache misses due to interrupt handlers
@@ -132,6 +132,10 @@ void scene_draw(camera_t *camera) {
 	//irq_enable();
 
 	render_set_depth_write(true);
+}
+
+void scene_draw(camera_t *camera) {
+	scene_draw_sky(camera);
 
 	// sky rendering uses open OP list
 	// close it and open TR for everything else
@@ -139,8 +143,12 @@ void scene_draw(camera_t *camera) {
  	pvr_list_begin(PVR_LIST_TR_POLY);
 	pvr_dr_init(&dr_state);
 
-	// scenery/object draw distance for player ship current track section
-	float drawdist = g.track.sections[g.ships[g.pilot].section_num].scenedist;
+	scene_draw_objects(camera);
+}
+
+void scene_draw_objects(camera_t *camera) {
+	// scenery/object draw distance for the ship of the current viewport
+	float drawdist = g.track.sections[g.ships[g.render_pilot].section_num].scenedist * draw_dist_factor_sq();
 
 	// Calculate the camera forward vector, so we can cull everything that's
 	// behind. Ideally we'd want to do a full frustum culling here. FIXME.

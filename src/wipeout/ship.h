@@ -149,6 +149,9 @@ typedef struct ship_t {
 	sfx_t *sfx_engine_intake;
 	sfx_t *sfx_turbulence;
 	sfx_t *sfx_shield;
+
+	// 0..3 for a human player, -1 for an AI ship
+	int8_t player_index;
 } ship_t;
 
 void ships_load(void);

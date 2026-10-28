@@ -69,6 +69,13 @@ void render_set_resolution(render_resolution_t res);
 void render_set_post_effect(render_post_effect_t post);
 vec2i_t render_size(void);
 
+// Split screen: restrict all drawing (3D and 2D) to a rectangle of the
+// 640x480 frame. x, y, w and h must be multiples of 32 (hardware tile size).
+// render_size() then returns the size of the viewport.
+void render_set_viewport(int x, int y, int w, int h);
+void render_reset_viewport(void);
+void render_begin_transparent_list(void);
+
 void render_frame_prepare(void);
 void render_frame_end(void);
 

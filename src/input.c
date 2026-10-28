@@ -146,11 +146,14 @@ static const char *button_names[] = {
 	[INPUT_MOUSE_WHEEL_DOWN] = "MWDOWN",
 };
 
-static float actions_state[INPUT_ACTION_MAX];
-static bool actions_pressed[INPUT_ACTION_MAX];
-static bool actions_released[INPUT_ACTION_MAX];
+// One set of action states per player. input_state()/input_pressed()/
+// input_released() read the set of the "current" player (0 by default).
+static float actions_state[INPUT_MAX_PLAYERS][INPUT_ACTION_MAX];
+static bool actions_pressed[INPUT_MAX_PLAYERS][INPUT_ACTION_MAX];
+static bool actions_released[INPUT_MAX_PLAYERS][INPUT_ACTION_MAX];
+static int current_player = 0;
 
-static uint8_t expected_button[INPUT_ACTION_MAX];
+static uint8_t expected_button[INPUT_MAX_PLAYERS][INPUT_ACTION_MAX];
 static uint8_t bindings[INPUT_LAYER_MAX][INPUT_BUTTON_MAX];
 
 static input_capture_callback_t capture_callback;
@@ -173,7 +176,11 @@ void input_clear(void) {
 	clear(actions_released);
 }
 
-void input_set_layer_button_state(input_layer_t layer, button_t button, float state) {
+void input_set_current_player(int player) {
+	current_player = (player >= 0 && player < INPUT_MAX_PLAYERS) ? player : 0;
+}
+
+void input_set_layer_button_state(input_layer_t layer, int player, button_t button, float state) {
 	error_if(layer < 0 || layer >= INPUT_LAYER_MAX, "Invalid input layer %d", layer);
 
 	uint8_t action = bindings[layer][button];
@@ -181,35 +188,41 @@ void input_set_layer_button_state(input_layer_t layer, button_t button, float st
 		return;
 	}
 
-	uint8_t expected = expected_button[action];
+	uint8_t expected = expected_button[player][action];
 	if (!expected || expected == button) {
 		state = (state > INPUT_DEADZONE) ? state : 0;
 
-		if (state && !actions_state[action]) {
-			actions_pressed[action] = true;
+		if (state && !actions_state[player][action]) {
+			actions_pressed[player][action] = true;
 
-			expected_button[action] = button;
+			expected_button[player][action] = button;
 		}
-		else if (!state && actions_state[action]) {
-			actions_released[action] = true;
+		else if (!state && actions_state[player][action]) {
+			actions_released[player][action] = true;
 
-			expected_button[action] = INPUT_BUTTON_NONE;
+			expected_button[player][action] = INPUT_BUTTON_NONE;
 		}
-		actions_state[action] = state;
+		actions_state[player][action] = state;
 	}
 }
 
-void input_set_button_state(button_t button, float state) {
+void input_set_player_button_state(int player, button_t button, float state) {
+	error_if(player < 0 || player >= INPUT_MAX_PLAYERS, "Invalid input player %d", player);
 	error_if(button < 0 || button >= INPUT_BUTTON_MAX, "Invalid input button %d", button);
 
-	input_set_layer_button_state(INPUT_LAYER_SYSTEM, button, state);
-	input_set_layer_button_state(INPUT_LAYER_USER, button, state);
+	input_set_layer_button_state(INPUT_LAYER_SYSTEM, player, button, state);
+	input_set_layer_button_state(INPUT_LAYER_USER, player, button, state);
 
-	if (capture_callback) {
+	// Only player 0 can rebind buttons
+	if (player == 0 && capture_callback) {
 		if (state > INPUT_DEADZONE_CAPTURE) {
 			capture_callback(capture_user, button, 0);
 		}
 	}
+}
+
+void input_set_button_state(button_t button, float state) {
+	input_set_player_button_state(0, button, state);
 }
 
 void input_set_mouse_pos(int32_t x, int32_t y) {
@@ -234,7 +247,9 @@ void input_bind(input_layer_t layer, button_t button, uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
 	error_if(layer < 0 || layer >= INPUT_LAYER_MAX, "Invalid input layer %d", layer);
 
-	actions_state[action] = 0;
+	for (int p = 0; p < INPUT_MAX_PLAYERS; p++) {
+		actions_state[p][action] = 0;
+	}
 	bindings[layer][button] = action;
 
 	// this fixes the issue where remapped buttons dont actually work
@@ -264,17 +279,17 @@ void input_unbind_all(input_layer_t layer) {
 
 float input_state(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
-	return actions_state[action];
+	return actions_state[current_player][action];
 }
 
 bool input_pressed(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
-	return actions_pressed[action];
+	return actions_pressed[current_player][action];
 }
 
 bool input_released(uint8_t action) {
 	error_if(action < 0 || action >= INPUT_ACTION_MAX, "Invalid input action %d", action);
-	return actions_released[action];
+	return actions_released[current_player][action];
 }
 
 vec2_t input_mouse_pos(void) {

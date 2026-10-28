@@ -9,6 +9,7 @@
 #include "track.h"
 
 #define NUM_AI_OPPONENTS 7
+#define MAX_HUMAN_PLAYERS 4
 #define NUM_PILOTS_PER_TEAM 2
 #define NUM_NON_BONUS_CIRCUTS 6
 #define NUM_MUSIC_TRACKS 11
@@ -224,6 +225,11 @@ typedef struct {
 	int team;
 	int pilot;
 	int circut;
+
+	// Human players. human_pilot[0] is always the same as pilot.
+	int players_chosen; // number of players chosen in the menus
+	int num_players;
+	int human_pilot[MAX_HUMAN_PLAYERS];
 	bool is_attract_mode;
 	bool show_credits;
 
@@ -238,8 +244,13 @@ typedef struct {
 	pilot_points_t race_ranks[NUM_PILOTS];
 	pilot_points_t championship_ranks[NUM_PILOTS];
 
+	// Player 0 uses camera and droid. Other human players use camera_p and
+	// droid_p (see camera_of_player() and droid_of_player()).
 	camera_t camera;
 	droid_t droid;
+	camera_t camera_p[MAX_HUMAN_PLAYERS - 1];
+	droid_t droid_p[MAX_HUMAN_PLAYERS - 1];
+	int render_pilot; // ship of the viewport being drawn
 	ship_t ships[NUM_PILOTS];
 	track_t track;
 } game_t;
@@ -291,6 +302,33 @@ typedef struct {
 
 extern const game_def_t def;
 extern game_t g;
+
+static inline camera_t *camera_of_player(int player) {
+	return (player <= 0) ? &g.camera : &g.camera_p[player - 1];
+}
+
+static inline droid_t *droid_of_player(int player) {
+	return (player <= 0) ? &g.droid : &g.droid_p[player - 1];
+}
+
+// Split screen draws the track once per player: shorten the draw distances
+// to keep a decent frame rate. These factors apply to distances (1.0 = the
+// normal distance), lower them for more speed, raise them for a farther view.
+#define SPLIT_DRAW_DIST_2_PLAYERS 0.85f
+#define SPLIT_DRAW_DIST_3_4_PLAYERS 0.70f
+
+// Number of track sections within which other ships are drawn
+#define SHIP_VISIBLE_SECTIONS 20
+#define SHIP_VISIBLE_SECTIONS_3_4_PLAYERS 12
+
+// Factor to apply to the squared draw distances of the track sections
+static inline float draw_dist_factor_sq(void) {
+	if (g.num_players <= 1) {
+		return 1.0f;
+	}
+	float f = (g.num_players == 2) ? SPLIT_DRAW_DIST_2_PLAYERS : SPLIT_DRAW_DIST_3_4_PLAYERS;
+	return f * f;
+}
 extern save_t save;
 
 void game_init(void);

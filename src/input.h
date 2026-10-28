@@ -167,6 +167,12 @@ void input_unbind_all(input_layer_t layer);
 uint8_t input_bound_to_action(button_t button);
 
 void input_set_button_state(button_t button, float state);
+
+// Multi-player support: each player has its own set of action states.
+// Player 0 is the one used by the menus and by all legacy code.
+#define INPUT_MAX_PLAYERS 4
+void input_set_player_button_state(int player, button_t button, float state);
+void input_set_current_player(int player);
 void input_set_mouse_pos(int32_t x, int32_t y);
 void input_textinput(int32_t ascii_char);
 

@@ -12,6 +12,11 @@
 #include "camera.h"
 #include "game.h"
 
+// Split screen external camera: distance behind and height above the ship
+// (normal value: 1024 behind, 200 above). Increase to see more of the track.
+#define CAMERA_SPLIT_BACK 1536.0f
+#define CAMERA_SPLIT_UP 320.0f
+
 void camera_init(camera_t *camera, section_t *section) {
 	camera->section = section;
 	for (int i = 0; i < 10; i++) {
@@ -41,8 +46,11 @@ void camera_update(camera_t *camera, ship_t *ship, droid_t *droid) {
 }
 
 void camera_update_race_external(camera_t *camera, ship_t *ship, droid_t *droid) {
-	vec3_t pos = vec3_sub(ship->position, vec3_mulf(ship->dir_forward, 1024));
-	pos.y -= 200;
+	// The split screen viewports are shorter: stay further back and higher
+	float back = (g.num_players > 1) ? CAMERA_SPLIT_BACK : 1024.0f;
+	float up = (g.num_players > 1) ? CAMERA_SPLIT_UP : 200.0f;
+	vec3_t pos = vec3_sub(ship->position, vec3_mulf(ship->dir_forward, back));
+	pos.y -= up;
 	camera->section = track_nearest_section(pos, /* vec3(1,1,1),  */camera->section, NULL);
 	section_t *next = camera->section->next;
 

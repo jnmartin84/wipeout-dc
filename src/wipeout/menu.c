@@ -167,6 +167,16 @@ void menu_update(menu_t *menu) {
 		else {
 			ui_draw_text(page->title, ui_scaled_pos(page->title_anchor, title_pos), UI_SIZE_12, UI_COLOR_ACCENT);	
 		}
+		if (page->subtitle) {
+			// second line of the title
+			vec2i_t subtitle_pos = vec2i(title_pos.x, title_pos.y + 16);
+			if (flags_is(page->layout_flags, MENU_ALIGN_CENTER)) {
+				ui_draw_text_centered(page->subtitle, ui_scaled_pos(page->title_anchor, subtitle_pos), UI_SIZE_12, UI_COLOR_ACCENT);
+			}
+			else {
+				ui_draw_text(page->subtitle, ui_scaled_pos(page->title_anchor, subtitle_pos), UI_SIZE_12, UI_COLOR_ACCENT);
+			}
+		}
 
 		page = &menu->pages[menu->index];
 		for (int i = 0; i < page->entries_len; i++) {

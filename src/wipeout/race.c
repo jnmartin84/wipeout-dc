@@ -19,6 +19,17 @@
 #include "particle.h"
 #include "menu.h"
 #include "ship_ai.h"
+
+// While there are no menus to choose the number of players, every extra
+// controller plugged in takes over one more ship (up to MULTIPLAYER_MAX_PLAYERS).
+// 1: ignore the menu, every controller plugged in is a player (for testing)
+// 0: the number of players comes from the menu
+#ifndef MULTIPLAYER_TEST
+#define MULTIPLAYER_TEST 0
+#endif
+#ifndef MULTIPLAYER_MAX_PLAYERS
+#define MULTIPLAYER_MAX_PLAYERS 4
+#endif
 #include "ingame_menus.h"
 
 #define ATTRACT_DURATION 60.0
@@ -26,6 +37,7 @@
 
 static bool is_paused = false;
 static bool menu_is_scroll_text = false;
+static int players_finished = 0; // bit mask, one bit per human player
 static float attract_start_time;
 static menu_t *active_menu = NULL;
 extern volatile uint32_t last_five_tracks[5];
@@ -97,6 +109,95 @@ void race_init(void) {
 extern int sprites_to_draw;
 void draw_all_sprites(void);
 extern void ShakeScreen(void);
+
+// Split screen layout. Every viewport is aligned on 32 pixels tiles (the
+// hardware clips on tiles), with a black band between viewports:
+// 2 players: two strips of 640x224, 4 players: four quarters of 320x224.
+static void race_viewport_rect(int player, int *x, int *y, int *w, int *h) {
+	if (g.num_players == 2) {
+		*x = 0;
+		*y = (player == 0) ? 0 : 256;
+		*w = 640;
+		*h = 224;
+	}
+	else {
+		*x = (player & 1) ? 320 : 0;
+		*y = (player & 2) ? 256 : 0;
+		*w = 320;
+		*h = 224;
+	}
+}
+
+static void race_draw_split(void) {
+	int x, y, w, h;
+
+	// Pass 1, opaque list: the sky of every viewport
+	for (int p = 0; p < g.num_players; p++) {
+		race_viewport_rect(p, &x, &y, &w, &h);
+		render_set_viewport(x, y, w, h);
+
+		camera_t *camera = camera_of_player(p);
+		render_set_view(camera->position, camera->angle);
+		scene_draw_sky(camera);
+	}
+
+	// Pass 2, transparent list: everything else, viewport by viewport
+	render_begin_transparent_list();
+
+	int saved_ui_scale = ui_get_scale();
+	for (int p = 0; p < g.num_players; p++) {
+		race_viewport_rect(p, &x, &y, &w, &h);
+		render_set_viewport(x, y, w, h);
+
+		camera_t *camera = camera_of_player(p);
+		g.render_pilot = g.human_pilot[p];
+
+		render_set_view(camera->position, camera->angle);
+
+		scene_draw_objects(camera);
+
+		render_set_cull_backface(false);
+		track_draw(camera);
+		render_set_cull_backface(true);
+
+		ships_draw();
+		for (int d = 0; d < g.num_players; d++) {
+			droid_draw(droid_of_player(d));
+		}
+
+		weapons_draw();
+		particles_draw();
+
+		// deferred trees and other things
+		if (sprites_to_draw) {
+			render_set_depth_write(false);
+			draw_all_sprites();
+			render_set_depth_write(true);
+		}
+
+		// Draw 2d, in the viewport
+		render_set_view_2d();
+		ui_set_scale(1);
+		if (flags_is(g.ships[g.render_pilot].flags, SHIP_RACING)) {
+			hud_draw(&g.ships[g.render_pilot]);
+		}
+		ui_set_scale(saved_ui_scale);
+	}
+
+	// Menus use the whole screen
+	render_reset_viewport();
+	g.render_pilot = g.pilot;
+	render_set_view_2d();
+
+	if (active_menu) {
+		if (!menu_is_scroll_text) {
+			vec2i_t size = render_size();
+			render_push_2d(vec2i(0, 0), size, rgba(0, 0, 0, 128), RENDER_NO_TEXTURE);
+		}
+		menu_update(active_menu);
+	}
+}
+
 void race_update(void) {
 	if (is_paused) {
 		if (!active_menu) {
@@ -108,8 +209,11 @@ void race_update(void) {
 	}
 	else {
 		ships_update();
-		droid_update(&g.droid, &g.ships[g.pilot]);
-		camera_update(&g.camera, &g.ships[g.pilot], &g.droid);
+		for (int p = 0; p < g.num_players; p++) {
+			ship_t *player_ship = &g.ships[g.human_pilot[p]];
+			droid_update(droid_of_player(p), player_ship);
+			camera_update(camera_of_player(p), player_ship, droid_of_player(p));
+		}
 		ShakeScreen();
 		weapons_update();
 		particles_update();
@@ -138,6 +242,12 @@ void race_update(void) {
 		else if (active_menu == NULL && (input_pressed(A_MENU_START) || input_pressed(A_MENU_QUIT))) {
 			race_pause();
 		}
+	}
+
+	g.render_pilot = g.pilot;
+	if (g.num_players > 1) {
+		race_draw_split();
+		return;
 	}
 
 	// Draw 3D
@@ -186,6 +296,30 @@ void race_update(void) {
 }
 
 void race_start(void) {
+	// Human players. Player 0 is the one who picked a ship in the menus.
+	g.num_players = 1;
+	g.human_pilot[0] = g.pilot;
+	if (!g.is_attract_mode && g.race_type != RACE_TYPE_TIME_TRIAL) {
+		int wanted = g.players_chosen;
+#if MULTIPLAYER_TEST
+		wanted = MULTIPLAYER_MAX_PLAYERS;
+#endif
+		// never more players than controllers plugged in
+		int controllers = platform_num_controllers();
+		if (wanted > controllers) {
+			wanted = controllers;
+		}
+		if (wanted > MULTIPLAYER_MAX_PLAYERS) {
+			wanted = MULTIPLAYER_MAX_PLAYERS;
+		}
+		if (g.race_type != RACE_TYPE_SINGLE && !MULTIPLAYER_TEST) {
+			wanted = 1;
+		}
+		for (int k = 1; k < NUM_PILOTS && g.num_players < wanted; k++) {
+			g.human_pilot[g.num_players++] = (g.pilot + k) % NUM_PILOTS;
+		}
+	}
+
 	render_state.in_race = 1;
 	active_menu = NULL;
 	sfx_reset();
@@ -197,10 +331,16 @@ void race_start(void) {
 	} else {
 		render_reset_proj(96000.0f);
 	}
-	camera_init(&g.camera, g.track.sections);
-	g.camera.update_func = camera_update_race_intro;
+	g.render_pilot = g.pilot;
+	players_finished = 0;
+	for (int p = 0; p < g.num_players; p++) {
+		camera_init(camera_of_player(p), g.track.sections);
+		camera_of_player(p)->update_func = camera_update_race_intro;
+	}
 	ships_init(g.track.sections);
-	droid_init(&g.droid, &g.ships[g.pilot]);
+	for (int p = 0; p < g.num_players; p++) {
+		droid_init(droid_of_player(p), &g.ships[g.human_pilot[p]]);
+	}
 	particles_init();
 	weapons_init();
 
@@ -236,6 +376,28 @@ void race_restart(void) {
 
 static bool sort_points_compare(pilot_points_t *pa, pilot_points_t *pb) {
 	return (pa->points < pb->points);
+}
+
+// Single player: same as race_end(). Several players: a player who finishes
+// gets his ship released (autopilot), the race ends when all of them finished.
+void race_player_finished(int player) {
+	if (g.num_players <= 1) {
+		race_end();
+		return;
+	}
+
+	players_finished |= (1 << player);
+
+	ship_t *ship = &g.ships[g.human_pilot[player]];
+	flags_rm(ship->flags, SHIP_RACING);
+	ship->remote_thrust_max = 3160;
+	ship->remote_thrust_mag = 32;
+	ship->speed = 3160;
+	camera_of_player(player)->update_func = camera_update_attract_random;
+
+	if (players_finished == ((1 << g.num_players) - 1)) {
+		race_end();
+	}
 }
 
 void race_end(void) {

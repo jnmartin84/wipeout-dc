@@ -316,7 +316,7 @@ void weapon_update_mine_wait_for_release(weapon_t *self) {
 		self->track_hit_particle = PARTICLE_TYPE_NONE;
 		self->ship_hit_particle = PARTICLE_TYPE_FIRE;
 
-		if (self->owner->pilot == g.pilot) {
+		if (self->owner->player_index >= 0) {
 			sfx_play(SFX_MINE_DROP);
 		}
 	}
@@ -357,7 +357,7 @@ void weapon_update_mine(weapon_t *self) {
 		sfx_play_at(SFX_EXPLOSION_1, self->position, vec3(0,0,0), 1);
 		self->active = false;
 		if (flags_not(ship->flags, SHIP_SHIELDED)) {
-			if (ship->pilot == g.pilot) {
+			if (ship->player_index >= 0) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.125));
 				SetShake(20);
 			}
@@ -385,7 +385,7 @@ void weapon_fire_missile(ship_t *ship) {
 	self->drag = 0.25;
 	weapon_set_trajectory(self);
 
-	if (self->owner->pilot == g.pilot) {
+	if (self->owner->player_index >= 0) {
 		sfx_play(SFX_MISSILE_FIRE);
 	}
 }
@@ -405,7 +405,7 @@ void weapon_update_missile(weapon_t *self) {
 		self->active = false;
 
 		if (flags_not(ship->flags, SHIP_SHIELDED)) {
-			if (ship->pilot == g.pilot) {
+			if (ship->player_index >= 0) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.75));
 				ship->angular_velocity.z += rand_float(-0.1, 0.1);
 				ship->turn_rate_from_hit = rand_float(-0.1, 0.1);
@@ -435,7 +435,7 @@ void weapon_fire_rocket(ship_t *ship) {
 	self->drag = 0.03125;
 	weapon_set_trajectory(self);
 
-	if (self->owner->pilot == g.pilot) {
+	if (self->owner->player_index >= 0) {
 		sfx_play(SFX_MISSILE_FIRE);
 	}
 }
@@ -453,7 +453,7 @@ void weapon_update_rocket(weapon_t *self) {
 		self->active = false;
 
 		if (flags_not(ship->flags, SHIP_SHIELDED)) {
-			if (ship->pilot == g.pilot) {
+			if (ship->player_index >= 0) {
 				ship->velocity = vec3_sub(ship->velocity, vec3_mulf(ship->velocity, 0.75));
 				ship->angular_velocity.z += rand_float(-0.1, 0.1);;
 				ship->turn_rate_from_hit = rand_float(-0.1, 0.1);;
@@ -485,7 +485,7 @@ void weapon_fire_ebolt(ship_t *ship) {
 	self->drag = 0.25;
 	weapon_set_trajectory(self);
 
-	if (self->owner->pilot == g.pilot) {
+	if (self->owner->player_index >= 0) {
 		sfx_play(SFX_EBOLT);
 	}
 }
@@ -586,7 +586,7 @@ void weapon_update_shield(weapon_t *self) {
 void weapon_fire_turbo(ship_t *ship) {
 	ship->velocity = vec3_add(ship->velocity, vec3_mulf(ship->dir_forward, 32768.0f)); // unitVecNose.vx) << 3)
 
-	if (ship->pilot == g.pilot) {
+	if (ship->player_index >= 0) {
 		sfx_t *sfx = sfx_play(SFX_MISSILE_FIRE);
 		sfx->pitch = 0.25;
 	}

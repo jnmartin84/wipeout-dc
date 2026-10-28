@@ -40,17 +40,24 @@ int if_to_await = 0;
 
 #define configDeadzone (0x04)
 
-void platform_pump_events()
+static uint16_t old_buttons_p[INPUT_MAX_PLAYERS];
+
+// Number of controllers currently plugged in (up to INPUT_MAX_PLAYERS)
+int platform_num_controllers(void)
 {
-	maple_device_t *cont;
-	cont_state_t *state;
+	int n = 0;
+	for (int i = 0; i < INPUT_MAX_PLAYERS; i++) {
+		if (maple_enum_type(i, MAPLE_FUNC_CONTROLLER))
+			n++;
+	}
+	return n;
+}
 
-	cont = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
-	if (!cont)
-		return;
-	state = (cont_state_t *)maple_dev_status(cont);
-
- 	rel_buttons = (old_buttons ^ state->buttons);
+static void pump_controller(int player, cont_state_t *state)
+{
+	uint16_t rel = (old_buttons_p[player] ^ state->buttons);
+	if (player == 0)
+		rel_buttons = rel;
 
 #if 0
 	if (state->ltrig && state->rtrig) {
@@ -81,49 +88,66 @@ void platform_pump_events()
 
 	// joystick
 	if (stick_x < 0) {
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_LEFT, -stick_x);
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_RIGHT, 0);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_LEFT, -stick_x);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_RIGHT, 0);
 	} else {
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_RIGHT, stick_x);
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_LEFT, 0);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_RIGHT, stick_x);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_LEFT, 0);
 	}
 
 	if (stick_y < 0) {
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_UP, -stick_y);
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_DOWN, 0);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_UP, -stick_y);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_DOWN, 0);
 	} else {
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_DOWN, stick_y);
-		input_set_button_state(INPUT_GAMEPAD_L_STICK_UP, 0);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_DOWN, stick_y);
+		input_set_player_button_state(player, INPUT_GAMEPAD_L_STICK_UP, 0);
 	}
 
 	// work-around so the remap menu is functional
 	if (if_to_await)
-		input_set_button_state(INPUT_GAMEPAD_START, (state->buttons & CONT_START) && (rel_buttons & CONT_START) ? 1.0f : 0.0f);
+		input_set_player_button_state(player, INPUT_GAMEPAD_START, (state->buttons & CONT_START) && (rel & CONT_START) ? 1.0f : 0.0f);
 	else
-		input_set_button_state(INPUT_GAMEPAD_START, (state->buttons & CONT_START) ? 1.0f : 0.0f);
+		input_set_player_button_state(player, INPUT_GAMEPAD_START, (state->buttons & CONT_START) ? 1.0f : 0.0f);
 
 	// work-around so the remap menu is functional
 	if (if_to_await)
-		input_set_button_state(INPUT_GAMEPAD_A, (state->buttons & CONT_A) && (rel_buttons & CONT_A) ? 1.0f : 0.0f);
+		input_set_player_button_state(player, INPUT_GAMEPAD_A, (state->buttons & CONT_A) && (rel & CONT_A) ? 1.0f : 0.0f);
 	else
-		input_set_button_state(INPUT_GAMEPAD_A, (state->buttons & CONT_A) ? 1.0f : 0.0f);
+		input_set_player_button_state(player, INPUT_GAMEPAD_A, (state->buttons & CONT_A) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_B, (state->buttons & CONT_B) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_B, (state->buttons & CONT_B) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_X, (state->buttons & CONT_X) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_X, (state->buttons & CONT_X) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_Y, (state->buttons & CONT_Y) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_Y, (state->buttons & CONT_Y) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_L_TRIGGER, ((uint8_t)state->ltrig) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_L_TRIGGER, ((uint8_t)state->ltrig) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_R_TRIGGER, ((uint8_t)state->rtrig) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_R_TRIGGER, ((uint8_t)state->rtrig) ? 1.0f : 0.0f);
 
-	input_set_button_state(INPUT_GAMEPAD_DPAD_UP, (state->buttons & CONT_DPAD_UP) ? 1.0f : 0.0f);
-	input_set_button_state(INPUT_GAMEPAD_DPAD_DOWN, (state->buttons & CONT_DPAD_DOWN) ? 1.0f : 0.0f);
-	input_set_button_state(INPUT_GAMEPAD_DPAD_LEFT, (state->buttons & CONT_DPAD_LEFT) ? 1.0f : 0.0f);
-	input_set_button_state(INPUT_GAMEPAD_DPAD_RIGHT, (state->buttons & CONT_DPAD_RIGHT) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_DPAD_UP, (state->buttons & CONT_DPAD_UP) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_DPAD_DOWN, (state->buttons & CONT_DPAD_DOWN) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_DPAD_LEFT, (state->buttons & CONT_DPAD_LEFT) ? 1.0f : 0.0f);
+	input_set_player_button_state(player, INPUT_GAMEPAD_DPAD_RIGHT, (state->buttons & CONT_DPAD_RIGHT) ? 1.0f : 0.0f);
 
-	old_buttons = state->buttons;
+	old_buttons_p[player] = state->buttons;
+	if (player == 0)
+		old_buttons = state->buttons;
+}
+
+void platform_pump_events()
+{
+	for (int player = 0; player < INPUT_MAX_PLAYERS; player++) {
+		maple_device_t *cont = maple_enum_type(player, MAPLE_FUNC_CONTROLLER);
+		if (!cont)
+			continue;
+
+		cont_state_t *state = (cont_state_t *)maple_dev_status(cont);
+		if (!state)
+			continue;
+
+		pump_controller(player, state);
+	}
 }
 
 static float Sys_FloatTime(void) {
@@ -370,7 +394,7 @@ vec2i_t platform_screen_size(void) {
 	return screen_size;
 }
 
-KOS_INIT_FLAGS(INIT_DEFAULT);
+KOS_INIT_FLAGS(INIT_DEFAULT | INIT_QUIET);
 int main(int argc, char *argv[]) {
 	// Figure out the absolute asset and userdata paths. These may either be
 	// supplied at build time through -DPATH_ASSETS=.. and -DPATH_USERDATA=..
